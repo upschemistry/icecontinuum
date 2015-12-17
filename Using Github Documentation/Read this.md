@@ -15,10 +15,10 @@ The git add command is necessary in that you must tell git which files you are g
 This commits changes to your local repository. Note that it does not commit them to the cloud. Also, make sure you do the -m "message". Github will not let you commit the file unless you have a message (the point is to explain what you are commiting, why, etc).  
 **8: Pushing**
 Here's a breakdown  
-git - telling the terminal you are using a git command  
-push - put it on the server  
-origin - An alias for the name of the repo on YOUR system. Origin is a default alias given by your system, it is not an actual property of the repo. Changing the alias is discussed later.  
-master - The name of the branch to which you would like to push to. Yes, you can "branch off" of the master and create your own little space for editing code.
+*git - telling the terminal you are using a git command  
+*push - put it on the server  
+*origin - An alias for the name of the repo on YOUR system. Origin is a default alias given by your system, it is not an actual property of the repo. Changing the alias is discussed later.  
+*master - The name of the branch to which you would like to push to. Yes, you can "branch off" of the master and create your own little space for editing code.
 
 ###Tips using Github and other useful Commands
 
