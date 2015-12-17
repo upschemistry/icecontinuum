@@ -35,9 +35,6 @@ This is an important command because "git add ./" does not keep track of files y
 git add -A ./  
 This command is basically a combination of add all files that I added and remove all files I deleted. If you ever delete a file from the repo (which of course, can happen quite frequently), this command is a handy way to track all of the additions and deletions you have made. If you want, you can even use this command instead of git add ./
 
-git status  
-This command tells you what changes have been made since your last commit
-
 **Other Tips**  
 If multiple people happen to be working on the same repository, it is generally a good idea to have a copy of the code **not** in the repository and make edits to that first. When you are ready to push the code up, I pull from github, then copy my code into the repo, then push it up. If you are editing the code that is directly in the repo, be wary of the following situation.  
 You pull from github. You excitedly begin to work on the code within the repo. While you are working, someone else commits changes to the repo, unaware that you are working on code. After some intense work, you finally finish! Yay, congrats. You go to push the code, but github will not allow you to, because you have made edits without pulling the must recent version of the repo! This makes you sad because you must discard the edits before you can pull. 
