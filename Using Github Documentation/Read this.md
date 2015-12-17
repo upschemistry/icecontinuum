@@ -23,7 +23,13 @@ master - The name of the branch to which you would like to push to. Yes, you can
 **Tips using Github and other useful Commands**
 
 *Pulling from Github*  
-This is just as important as pushing!!!
+This is just as important as pushing!!!  
+git pull origin master  
+This gets all the information that is on github and puts it on your system. IT IS VERY IMPORTANT TO PULL BEFORE YOU PUSH. Github does not allow you to update files unless you have the most recent versions on your computer. Basically, it is preventing you from overwriting changes that other people made to files while you were busy editing those same files!
+
+*Removing Files*  
+git rm "file_name"  
+This is an important command because "git add ./" does not keep track of files you have deleted.
 
 *Tips*  
 If multiple people happen to be working on the same repository, it is generally a good idea to have a copy of the code **not** in the repository and make edits to that first. When you are ready to push the code up, I pull from github, then 
