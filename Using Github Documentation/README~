@@ -1,0 +1,8 @@
+Open the html file. The folder contains data that the html file references -- do not delete the folder.
+
+Once the "webpage" loads, here are the steps you should pay attention to.
+
+**STEP 3: Creating a local repository**
+Note that this is only necessary the first time you are initializing a repository. Once a repository (repo) has been initialized, this command is no longer necessary to use (unless for some reason, you want to put the repo somewhere else too). There is no limit to the number of places you can put the repository. You can even put this same repository on the same computer in multiple different places. One limitation: do not put a repo inside a repo.
+
+
