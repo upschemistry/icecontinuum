@@ -17,7 +17,7 @@ This commits changes to your local repository. Note that it does not commit them
 Here's a breakdown  
 git - telling the terminal you are using a git command  
 push - put it on the server  
-origin - An alias for the name of the repo on YOUR system. Origin is a default alias given by your system, it has not an actual property of the repo. Changing the alias is discussed later.  
+origin - An alias for the name of the repo on YOUR system. Origin is a default alias given by your system, it is not an actual property of the repo. Changing the alias is discussed later.  
 master - The name of the branch to which you would like to push to. Yes, you can "branch off" of the master and create your own little space for editing code.
 
 ###Tips using Github and other useful Commands
