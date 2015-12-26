@@ -50,7 +50,6 @@ You pull from github. You excitedly begin to work on the code within the repo. W
 
 *Aliases*  
 The alias is a system name for your repo. You can view the alias with the following command:  
-*git remote*
 *git remote -v*  
 Note that this only works when you are inside the repo. If you want to change the alias for any reason, this is the command to do so.  
 *git remote rename "Current_Alias" "New_Alias"*  
