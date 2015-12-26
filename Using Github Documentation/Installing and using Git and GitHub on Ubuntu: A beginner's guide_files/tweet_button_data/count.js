@@ -1,1 +1,0 @@
-/**/__twttr.receiveCount({"count":82,"url":"https:\/\/www.howtoforge.com\/tutorial\/install-git-and-github-on-ubuntu-14.04\/"});
