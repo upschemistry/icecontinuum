@@ -1,0 +1,16 @@
+Information about these steady states.
+
+Each of the files here were generated under certain conditions specified within the naming convention.
+Not all of the files are actually steady states, some show dendritic growth.
+
+The naming convention is as follows:
+D##-S##-E##-RE##-PFAC###-###k.npz
+	
+	D## 	- The value of diffperdt. Diffperdt is always less than one, so the numbers are after the decimal point. For instance, D0325 would mean a diffperdt of 0.0325
+	S## 	- Same numerical convention as diffperdt, but this one is supersaturation. S02 means a supersaturation of 0.02
+	E## 	- E is the diffusion coefficient at the edges. The numbers is a percent value of diffperdt. So E80 means that the diffusion coefficient at the edges is 0.80 (80%) that of diffperdt (that of the diffusion on the terraces).
+	RE## 	- Similar convention as E. RE is the rain at the edges, however, this is added onto the rain on the terraces. So RE10 means that the rain at the edges is 110% that of the rain on the terraces.
+	PFAC### - Value of the supersatpfactor after decimal. A number like 999 means the supersatpfac = 0.999	
+	###k 	- The amount of timesteps that have passed. 500k = 500,000
+
+ 
