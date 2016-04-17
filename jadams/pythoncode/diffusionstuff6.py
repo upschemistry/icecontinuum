@@ -191,4 +191,28 @@ def f1d(y, t, params):
     derivs = np.reshape(derivs,2*nx)
     return derivs
 
+def f1dflux(Fliq0, Ntot0, dt, params):
+    Nbar, Nstar, niter, sigmastep, sigma0, deprate, DoverdeltaX2, nx = params  # unpack parameters
+    
+    # Deposition
+    delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
+    sigD = (sigmastep - delta * sigma0)/(1+delta*sigma0)
+    depsurf = deprate * sigD
+    dFliq0 = getdNliq_dNtot(Ntot0,Nstar,Nbar,niter)*depsurf*dt
+    Fliq1 = Fliq0 + dFliq0
+     
+    # Package for output
+    return Fliq1
+
+def getsigmastep(x,xmax,center_reduction,sigmastepmax,method='sinusoid'):
+    sigmapfac = 1-center_reduction/100
+    xmid = max(x)/2
+    if method == 'sinusoid':
+        fsig = (np.cos(x/xmax*np.pi*2)+1)/2*(1-sigmapfac)+sigmapfac
+    elif method == 'parabola':
+        fsig = (x-xmid)**2/xmid**2*(1-sigmapfac)+sigmapfac
+    else:
+        print 'bad method'
+    return fsig*sigmastepmax
+        
 
