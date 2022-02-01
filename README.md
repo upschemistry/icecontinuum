@@ -2,6 +2,7 @@ UPSchemistry
 -------------
 
 Repository for Research students working on studying the nature of ice crystals with Steven Neshyba.
+*Collaborator Clarke Buckenmeyer
 
 The following types of files may be stored here:
 * Python Files and Corresponding Steady States
