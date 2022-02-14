@@ -212,7 +212,7 @@ def getsigmastep(x,xmax,center_reduction,sigmastepmax,method='sinusoid'):
     elif method == 'parabolic':
         fsig = (x-xmid)**2/xmid**2*(1-sigmapfac)+sigmapfac
     else:
-        print 'bad method'
+        print('bad method')
     return fsig*sigmastepmax
         
 
