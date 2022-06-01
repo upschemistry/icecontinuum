@@ -1,4 +1,4 @@
-![](https://github.com/user/Figure2.2.png)
+![](https://github.com/upschemistry/icecontinuum/Figure2.2.png)
 icecontinuum
 -------------
 
