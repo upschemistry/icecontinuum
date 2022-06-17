@@ -6,7 +6,8 @@ Created on Tue Jul 14 15:01:47 2015
 """
 import numpy as np
 import copy
-from numba import prange,njit
+import numba as nb
+from numba import prange,njit, jit
 
 @njit
 def diffuse(y_old, diff):
@@ -125,10 +126,10 @@ def getNiceoffset(Nbar=None, Nstar=None, Nmono=None, phi=None):
     Imin = np.argmin(Fliqtest)
     return Nicetest[Imin]
 
-@njit
+@jit
 def getNliq(Ntot,Nstar,Nbar,niter):
     fqll_last = 1.0
-    for i in prange(niter):
+    for i in range(niter):
         fqll_last = fqll_next(fqll_last,Ntot,Nstar,Nbar)
     return fqll_last*Nbar
 
