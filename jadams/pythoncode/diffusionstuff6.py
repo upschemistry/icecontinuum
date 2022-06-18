@@ -6,8 +6,7 @@ Created on Tue Jul 14 15:01:47 2015
 """
 import numpy as np
 import copy
-import numba as nb
-from numba import prange,njit, jit
+from numba import prange,njit
 
 @njit
 def diffuse(y_old, diff):
@@ -112,7 +111,7 @@ def getdeltaN(NIcep,NFliqp,Nbar,Nstar,Nmono,phi):
         #deltaN = getNFliq(NIcep-deltaN,Nbar,Nstar,Nmono,phi)-NFliqp
     return deltaN
 
-@jit
+#@jit
 def fqll_next(fqll_last,Ntot,Nstar,Nbar):
     #Ntot is a list of the amount of each type of ice
     fstar = Nstar/Nbar
@@ -127,12 +126,12 @@ def getNiceoffset(Nbar=None, Nstar=None, Nmono=None, phi=None):
     Imin = np.argmin(Fliqtest)
     return Nicetest[Imin]
 
-@jit
+#@jit
 def getNliq(Ntot,Nstar,Nbar,niter):
     fqll_last = 1.0
     for i in range(niter):
         fqll_last = fqll_next(fqll_last,Ntot,Nstar,Nbar)
-    return float(fqll_last*Nbar)
+    return fqll_last*Nbar
 
 @njit
 def fqllprime_next(fqll_last,Ntot,Nstar,Nbar):
@@ -145,7 +144,7 @@ def getNliqprime(Ntot,Nstar,Nbar,niter):
     f2 = getNliq(Ntot+.01,Nstar,Nbar,niter)
     return (f2-f1)/.01
 
-@njit
+#@njit
 def getdNliq_dNtot(Ntot,Nstar,Nbar,niter):
     dfqll_dNtot_last = 0.0
     fqll_last = 1.0
@@ -154,7 +153,7 @@ def getdNliq_dNtot(Ntot,Nstar,Nbar,niter):
         fqll_last = fqll_next(fqll_last,Ntot,Nstar,Nbar)
     return dfqll_dNtot_last*Nbar
 
-@njit 
+#@njit 
 def getdfqll_dNtot_next(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
     return fstar*np.cos(2*np.pi*(Ntot-fqll_last))*2*np.pi*(1-Nbar*dfqll_dNtot_last)
@@ -175,7 +174,7 @@ def f0d(y, t, params):
     derivs = [dFliq0_dt, dNtot_dt]
     return derivs
 
-@njit
+#@njit
 def f1d(y, t, params):
     Nbar, Nstar, niter, sigmastep, sigma0, deprate, DoverdeltaX2, nx = params  # unpack parameters
     Fliq0, Ntot0 = np.reshape(y,(2,nx))      # unpack current values of y
