@@ -104,16 +104,17 @@ def getNFliq(NIce,Nbar,Nstar,Nmono,phi):
 def getFliqPrime(NIce,Nbar,Nstar,Nmono,phi):
     return Nstar*np.cos(NIce/Nmono*2*np.pi-phi)*(1/Nmono*2*np.pi)
 
-@njit(parallel=True)
+@njit
 def getdeltaN(NIcep,NFliqp,Nbar,Nstar,Nmono,phi):
     deltaN = 0.0
-    for i in prange(10):
+    for i in range(10):
         deltaN = Nbar+Nstar*np.sin((NIcep-deltaN)/Nmono*2*np.pi-phi)-NFliqp
         #deltaN = getNFliq(NIcep-deltaN,Nbar,Nstar,Nmono,phi)-NFliqp
     return deltaN
 
-@njit
+@jit
 def fqll_next(fqll_last,Ntot,Nstar,Nbar):
+    #Ntot is a list of the amount of each type of ice
     fstar = Nstar/Nbar
     return 1 + fstar*np.sin(2*np.pi*(Ntot-Nbar*fqll_last))
 
@@ -131,7 +132,7 @@ def getNliq(Ntot,Nstar,Nbar,niter):
     fqll_last = 1.0
     for i in range(niter):
         fqll_last = fqll_next(fqll_last,Ntot,Nstar,Nbar)
-    return fqll_last*Nbar
+    return float(fqll_last*Nbar)
 
 @njit
 def fqllprime_next(fqll_last,Ntot,Nstar,Nbar):
