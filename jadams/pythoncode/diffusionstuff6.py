@@ -6,7 +6,7 @@ Created on Tue Jul 14 15:01:47 2015
 """
 import numpy as np
 import copy
-from numba import prange,njit
+from numba import prange,njit,types,jit
 
 @njit
 def diffuse(y_old, diff):
@@ -14,8 +14,7 @@ def diffuse(y_old, diff):
     l = len(y_old)
     for i in prange(1,l-1):
         y[i] = y_old[i] + ((diff[i+1]-diff[i-1])/2)*((y_old[i+1]-y_old[i-1])/2) + diff[i]*(y_old[i+1]-2*y_old[i]+y_old[i-1])
-
-#    # Boundary Conditions (reflection at ends)
+    # Boundary Conditions (reflection at ends)
     y[0] = y_old[0] + ((diff[1]-diff[0])/2)*((y_old[1]-y_old[0])/2)+diff[0]*(y_old[1]-2*y_old[0]+y_old[0]) #assuming second derivative for x[0] is essentially the same as  it is for x[1]
     y[l-1] = y_old[l-1] + ((diff[l-2]-diff[l-1])/2)*((y_old[l-2]-y_old[l-1])/2)+diff[l-1]*(y_old[l-2]-2*y_old[l-1]+y_old[l-1])
     return y
@@ -27,7 +26,7 @@ def diffuseP(y_old, diff):  # Returns the change only
     for i in prange(1,l-1):
         dy[i] = ((diff[i+1]-diff[i-1])/2)*((y_old[i+1]-y_old[i-1])/2) + diff[i]*(y_old[i+1]-2*y_old[i]+y_old[i-1])
 
-#    # Boundary Conditions (reflection at ends)
+    # Boundary Conditions (reflection at ends)
 #    dy[0] = ((diff[1]-diff[0])/2)*((y_old[1]-y_old[0])/2)+diff[0]*(y_old[1]-2*y_old[0]+y_old[0]) 
 #    dy[l-1] = ((diff[l-2]-diff[l-1])/2)*((y_old[l-2]-y_old[l-1])/2)+diff[l-1]*(y_old[l-2]-2*y_old[l-1]+y_old[l-1])
 
@@ -111,7 +110,13 @@ def getdeltaN(NIcep,NFliqp,Nbar,Nstar,Nmono,phi):
         #deltaN = getNFliq(NIcep-deltaN,Nbar,Nstar,Nmono,phi)-NFliqp
     return deltaN
 
-#@jit
+@njit("f8[:](f8[:],f8[:],f8,f8)") #important
+def fqll_next_array(fqll_last,Ntot,Nstar,Nbar):
+    #Ntot is a list of the amount of each type of ice
+    fstar = Nstar/Nbar
+    return 1 + fstar*np.sin(2*np.pi*(Ntot-Nbar*fqll_last))
+
+@njit("f8(f8,f8,f8,f8)") #important
 def fqll_next(fqll_last,Ntot,Nstar,Nbar):
     #Ntot is a list of the amount of each type of ice
     fstar = Nstar/Nbar
@@ -126,67 +131,90 @@ def getNiceoffset(Nbar=None, Nstar=None, Nmono=None, phi=None):
     Imin = np.argmin(Fliqtest)
     return Nicetest[Imin]
 
-#@jit
+@njit("f8[:](f8[:],f8,f8,i8)") #Ntot is ndarray of numbers (ints, become floats), Nstar and Nbar are floats, niter is an int literal
+def getNliq_array(Ntot,Nstar,Nbar,niter):
+    fqll_last = np.array([1.0])
+    for i in range(niter):
+        fqll_last = fqll_next_array(fqll_last,Ntot,Nstar,Nbar)
+    return fqll_last*Nbar
+
+@njit("f8(f8,f8,f8,i8)") #Ntot is ndarray of numbers (ints, become floats), Nstar and Nbar are floats, niter is an int literal
 def getNliq(Ntot,Nstar,Nbar,niter):
     fqll_last = 1.0
     for i in range(niter):
         fqll_last = fqll_next(fqll_last,Ntot,Nstar,Nbar)
     return fqll_last*Nbar
 
-@njit
+@njit((types.float64[:](types.float64[:],types.float64[:],types.float64,types.float64)))
 def fqllprime_next(fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
     return 1 + fstar*np.sin(2*np.pi*(Ntot-Nbar*fqll_last))
 
-@njit
+@njit#((types.float64(types.float64[:],types.float64,types.float64,types.int_)))
 def getNliqprime(Ntot,Nstar,Nbar,niter):
     f1 = getNliq(Ntot,Nstar,Nbar,niter)
     f2 = getNliq(Ntot+.01,Nstar,Nbar,niter)
     return (f2-f1)/.01
 
-#@njit
-def getdNliq_dNtot(Ntot,Nstar,Nbar,niter):
-    dfqll_dNtot_last = 0.0
-    fqll_last = 1.0
-    for i in prange(niter):
-        dfqll_dNtot_last = getdfqll_dNtot_next(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar)
-        fqll_last = fqll_next(fqll_last,Ntot,Nstar,Nbar)
-    return dfqll_dNtot_last*Nbar
-
-#@njit 
+@njit("f8(f8,f8,f8,f8,f8)") #quirk: fqll_last is a float but must also have array implemenetation for 1-d model
 def getdfqll_dNtot_next(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
     return fstar*np.cos(2*np.pi*(Ntot-fqll_last))*2*np.pi*(1-Nbar*dfqll_dNtot_last)
 
-def f0d(y, t, params):
-    Nbar, Nstar, niter, sigmastepmax, sigma0, deprate = params  # unpack parameters
+@njit("f8[:](f8[:],f8[:],f8[:],f8,f8)") #quirk: fqll_last is a float but must be array for above implemenetation
+def getdfqll_dNtot_next_array(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar):
+    fstar = Nstar/Nbar
+    return fstar*np.cos(2*np.pi*(Ntot-fqll_last))*2*np.pi*(1-Nbar*dfqll_dNtot_last)
+
+@njit("f8[:](f8[:],f8,f8,i8)")
+def getdNliq_dNtot_array(Ntot,Nstar,Nbar,niter):
+    dfqll_dNtot_last = np.array([0.0])
+    fqll_last = np.array([1.0])
+    for i in range(niter):
+        dfqll_dNtot_last = getdfqll_dNtot_next_array(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar)
+        fqll_last = fqll_next_array(fqll_last,Ntot,Nstar,Nbar)
+    return dfqll_dNtot_last*Nbar 
+
+@njit("f8(f8,f8,f8,i8)")
+def getdNliq_dNtot(Ntot,Nstar,Nbar,niter):
+    dfqll_dNtot_last = 0.0
+    fqll_last = 1.0
+    for i in range(niter):
+        dfqll_dNtot_last = getdfqll_dNtot_next(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar)
+        fqll_last = fqll_next(fqll_last,Ntot,Nstar,Nbar)
+    return dfqll_dNtot_last*Nbar 
+
+@njit("f8[:](f8[:],f8,f8[:],i8)") #float_params is a list not an array
+def f0d(y, t, float_params, niter):
+    Nbar, Nstar, sigmastepmax, sigma0, deprate = float_params  # unpack parameters
     
-    Fliq0, Ntot0 = y      # unpack current values of y
-    
+    Fliq0, Ntot0 = y   # unpack current values of y
+    #Fliq0, Ntot0 = np.reshape(y,2)    
+
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
     sigD = (sigmastepmax - delta * sigma0)/(1+delta*sigma0)
     depsurf = deprate * sigD
 
     #dFliq0_dt = getNliqprime(Ntot0,Nstar,Nbar,niter)*depsurf
-    dFliq0_dt = getdNliq_dNtot(Ntot0,Nstar,Nbar,niter)*depsurf
+    dFliq0_dt = getdNliq_dNtot(Ntot0,Nstar,Nbar,int(niter))*depsurf
     dNtot_dt = depsurf
     
-    derivs = [dFliq0_dt, dNtot_dt]
+    derivs = np.array([dFliq0_dt, dNtot_dt])
     return derivs
 
-#@njit
-def f1d(y, t, params):
-    Nbar, Nstar, niter, sigmastep, sigma0, deprate, DoverdeltaX2, nx = params  # unpack parameters
+@njit#("f8[:](f8[:],f8,f8[:],i8[:])")
+def f1d(y, t, float_params, int_params): 
+    Nbar, Nstar, sigmastep, sigma0, deprate, DoverdeltaX2 = float_params  # unpack parameters
+    niter, nx = int_params
+
     Fliq0, Ntot0 = np.reshape(y,(2,nx))      # unpack current values of y
-    #print np.shape(Fliq0); print Fliq0[0:5]
-    #print np.shape(Ntot0); print Ntot0[0:5]
     
     # Deposition
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
     sigD = (sigmastep - delta * sigma0)/(1+delta*sigma0)
     depsurf = deprate * sigD
     #dFliq0_dt = getNliqprime(Ntot0,Nstar,Nbar,niter)*depsurf
-    dFliq0_dt = getdNliq_dNtot(Ntot0,Nstar,Nbar,niter)*depsurf
+    dFliq0_dt = getdNliq_dNtot_array(Ntot0,Nstar,Nbar,niter)*depsurf
     dNtot_dt = depsurf
 
     # Diffusion
@@ -204,7 +232,7 @@ def f1d(y, t, params):
     dNtot_dt += dy
 
     # Package for output
-    derivs = list([dFliq0_dt, dNtot_dt])
+    derivs = [dFliq0_dt, dNtot_dt]# caause of current type issue
     derivs = np.reshape(derivs,2*nx)
     return derivs
 
