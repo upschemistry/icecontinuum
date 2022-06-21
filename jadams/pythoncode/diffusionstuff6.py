@@ -2,11 +2,13 @@
 """
 Created on Tue Jul 14 15:01:47 2015
 
-@author: nesh, jonathan
+@author: nesh, jonathan, Max
 """
 import numpy as np
 import copy
-from numba import prange,njit,types,jit
+from numba import prange,njit
+#NOTE: as of june 20 2022, the only functions that are used in continuum_model6 
+#       are those with explicit type signatures.
 
 @njit
 def diffuse(y_old, diff):
@@ -145,7 +147,7 @@ def getNliq(Ntot,Nstar,Nbar,niter):
         fqll_last = fqll_next(fqll_last,Ntot,Nstar,Nbar)
     return fqll_last*Nbar
 
-@njit((types.float64[:](types.float64[:],types.float64[:],types.float64,types.float64)))
+@njit("f8[:](f8[:],f8[:],f8,f8)")
 def fqllprime_next(fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
     return 1 + fstar*np.sin(2*np.pi*(Ntot-Nbar*fqll_last))
@@ -202,27 +204,27 @@ def f0d(y, t, float_params, niter):
     derivs = np.array([dFliq0_dt, dNtot_dt])
     return derivs
 
-@njit#("f8[:](f8[:],f8,f8[:],i8[:])")
-def f1d(y, t, float_params, int_params): 
-    Nbar, Nstar, sigmastep, sigma0, deprate, DoverdeltaX2 = float_params  # unpack parameters
+@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])")#, parallel = True) # in the current use case it is faster without paralellization
+def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
+     # unpack parameters
+    Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
     niter, nx = int_params
 
-    Fliq0, Ntot0 = np.reshape(y,(2,nx))      # unpack current values of y
+    # unpack current values of y
+    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(2,500))
     
     # Deposition
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
     sigD = (sigmastep - delta * sigma0)/(1+delta*sigma0)
     depsurf = deprate * sigD
-    #dFliq0_dt = getNliqprime(Ntot0,Nstar,Nbar,niter)*depsurf
     dFliq0_dt = getdNliq_dNtot_array(Ntot0,Nstar,Nbar,niter)*depsurf
     dNtot_dt = depsurf
 
     # Diffusion
     l = len(Fliq0)
-    dy = np.zeros(np.shape(Fliq0))
-    for i in prange(1,l-1):
+    dy = np.zeros((l,))#np.shape(Fliq0))
+    for i in prange(0,l):#(1,l-1):
         dy[i] = DoverdeltaX2*(Fliq0[i+1]-2*Fliq0[i]+Fliq0[i-1])
-    
         # Boundary Conditions (periodic at ends)
         dy[0] = DoverdeltaX2*(Fliq0[1]-2*Fliq0[0]+Fliq0[l-1]) 
         dy[l-1] = DoverdeltaX2*(Fliq0[0]-2*Fliq0[l-1]+Fliq0[l-2])
@@ -232,8 +234,8 @@ def f1d(y, t, float_params, int_params):
     dNtot_dt += dy
 
     # Package for output
-    derivs = [dFliq0_dt, dNtot_dt]# caause of current type issue
-    derivs = np.reshape(derivs,2*nx)
+    #derivs = np.reshape([dFliq0_dt, dNtot_dt],2*nx)
+    derivs = np.concatenate((dFliq0_dt,dNtot_dt))
     return derivs
 
 @njit
@@ -261,5 +263,3 @@ def getsigmastep(x,xmax,center_reduction,sigmastepmax,method='sinusoid'):
     else:
         print('bad method')
     return fsig*sigmastepmax
-        
-
