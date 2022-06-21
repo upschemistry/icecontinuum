@@ -105,7 +105,8 @@ def getdeltaN(NIcep,NFliqp,Nbar,Nstar,Nmono,phi):
 
 def fqll_next(fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
-    return 1 + fstar*np.sin(2*np.pi*(Ntot-Nbar*fqll_last))
+    ans = 1 + fstar*np.sin(2*np.pi*(Ntot-Nbar*fqll_last))
+    return ans
 
 def getNiceoffset(Nbar=None, Nstar=None, Nmono=None, phi=None):
     # to see the plots, use the getNiceoffset that is commented out
@@ -119,7 +120,8 @@ def getNliq(Ntot,Nstar,Nbar,niter):
     fqll_last = 1.0
     for i in range(niter):
         fqll_last = fqll_next(fqll_last,Ntot,Nstar,Nbar)
-    return fqll_last*Nbar
+    ans =fqll_last*Nbar
+    return ans
 
 def fqllprime_next(fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
@@ -159,7 +161,7 @@ def f0d(y, t, params):
     return derivs
 
 def f1d(y, t, params):
-    Nbar, Nstar, niter, sigmastep, sigma0, deprate, DoverdeltaX2, nx = params  # unpack parameters
+    Nbar, Nstar, niter, sigmastep, sigma0, deprate, DoverdeltaX2, nx = params
     Fliq0, Ntot0 = np.reshape(y,(2,nx))      # unpack current values of y
     #print np.shape(Fliq0); print Fliq0[0:5]
     #print np.shape(Ntot0); print Ntot0[0:5]
