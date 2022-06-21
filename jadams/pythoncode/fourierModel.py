@@ -7,6 +7,244 @@ Created on Tue Jul 14 15:01:47 2015
 import numpy as np
 import copy
 
+def fftnorm(u_full):
+    """Computes normalized FFT (such that FFT and IFFT are symmetrically normalized)
+    
+    Parameters
+    ----------
+    u_full : 1D Numpy Array (N,)
+        The vector whose discrete FFT is to be computed
+
+    Returns
+    -------
+    normalizedFFT : 1D Numpy Array (N,)
+        The transformed version of that vector
+    """
+    
+    N = u_full.shape[0]
+    normalizedFFT = np.fft.fft(u_full)*1/N
+    return normalizedFFT
+
+def ifftnorm(u_full):
+    """Computes normalized IFFT (such that FFT and IFFT are symmetrically normalized)
+    
+    Parameters
+    ----------
+    u_full : 1D Numpy Array (N,)
+        The vector whose discrete IFFT is to be computed
+
+    Returns
+    -------
+    normalizedIFFT : 1D Numpy Array (N,)
+        The transformed version of that vector
+    """
+    
+    N = u_full.shape[0]
+    normalizedIFFT = np.real(np.fft.ifft(u_full)*N)
+    return normalizedIFFT
+
+def convolution(nT,vKin,sigmaM,Nstar):
+    """Computes Fourier transform of the nonlinear term in the QLL PDE
+    
+    2 pi N^* sigmaM vKin cos(Ntot)
+    
+    Computed in real space and then converted back
+    to Fourier space.
+    
+    Parameters
+    ----------
+    nT : 1D Numpy Array (N,)
+        Total water layers
+        
+    vKin : TBD
+        TBD
+        
+    Nstar : TBD
+        TBD
+
+    Returns
+    -------
+    convo : 1D Numpy Array (N,)
+        Fourier transform of the nonlinear term
+    """
+    
+    # compute double sum in real space, then apply scalar multiplier
+    convo = fftnorm(np.cos(ifftnorm(nT))
+    convo = 2 * np.pi * Nstar * vKin * sigmaM * convo
+    return convo
+
+def markovKdV(u,M,alpha):
+    """Computes nonlinear part of Markov term in KdV
+    
+    C_k(u,v) = -(alpha * 1i * k) / 2 * sum_{i+j = k} u_i v_j
+    
+    where the sum of i and j is over a "full" system with M positive modes (user specified)
+    
+    Computed in real space to avoid loops and then converted back
+    to Fourier space.
+    
+    Parameters
+    ----------
+    u : 1D Numpy Array (N,)
+        Positive modes of state vector whose RHS is being computed
+        
+    M : int
+        Number of positive modes in "full" model for intermediary calculations
+        
+    alpha : float
+        Degree of nonlinearity in KdV
+
+    Returns
+    -------
+    nonlin0 : 1D Numpy Array (2*M,)
+        Nonlinear part of Markov term for given state vector
+        
+    u_full : 1D Numpy array (2*M,)
+        "full" state vector for use in later computations
+    """
+    
+    # construct full Fourier vector from only the positive modes
+    u_full = np.zeros(2*M) +1j*np.zeros(2*M)
+    u_full[0:u.shape[0]] = u
+    u_full[2*M-u.shape[0]+1:] = np.conj(np.flip(u[1:]))
+    
+    # compute the convolution sum
+    nonlin0 = convolutionSumKdV(u_full,u_full,alpha)
+    return nonlin0,u_full
+
+
+def RHSKdV(t,u,params):
+    """
+    Computes the RHS for a full KdV or ROM simulation. For use in solver.
+    
+    Parameters
+    ----------
+    t : float
+        Current time
+        
+    u : Numpy array (N,)
+        Current state vector
+              
+    params : Dictionary
+             Dictionary of relevant parameters (see below)
+        N : float, number of positive modes in simulation
+        M : float, number of positive modes in "full" intermediate compuation
+        alpha : float, degree of nonlinearity in KdV
+        epsilon : float, size of linear term (stiffness)
+        tau : float, time decay modifier
+        coeffs : Numpy array, renormalization coefficients for ROM (None if no ROM)
+
+        
+    Returns
+    -------
+    RHS : 1D Numpy array (N,)
+          Derivative of each positive mode in state vector
+    """
+    
+    # extract parameters from dictionary
+    N = params['N']
+    M = params['M']
+    alpha = params['alpha']
+    epsilon = params['epsilon']
+    tau = params['tau']
+    coeffs = params['coeffs']
+    
+    # construct wavenumber array
+    k = np.concatenate([np.arange(0,M),np.arange(-M,0)])
+    
+    
+    # Linear and Markov term
+    nonlin0,u_full = markovKdV(u,M,alpha)
+    RHS = 1j*k[0:N]**3*epsilon**2*u + nonlin0[0:N]
+    
+    if (np.any(coeffs == None)):
+        order = 0
+    else:
+        order = coeffs.shape[0]
+    
+    if (order >= 1):
+        # compute t-model term
+        
+        # define which modes are resolved / unresolved in full array
+        F_modes = np.concatenate([np.arange(0,N),np.arange(2*N-1,M+N+2),np.arange(2*M-N+1,2*M)])
+        G_modes = np.arange(N,2*M-N+1)
+    
+        # compute t-model term
+        nonlin1,uuStar = tModelKdV(u_full,nonlin0,alpha,F_modes)
+        RHS = RHS + coeffs[0]*nonlin1[0:N]*t**(1-tau)
+        
+        order = coeffs.shape[0]
+    
+    if (order >= 2):
+        # compute t2-model term
+        nonlin2,uk3,uu,A,AStar,B,BStar,C,CStar,D,DStar = t2ModelKdV(u_full,nonlin0,uuStar,alpha,F_modes,G_modes,k,epsilon)
+        RHS = RHS + coeffs[1]*nonlin2[0:N]*t**(2*(1-tau))
+    
+    if (order >= 3):
+        # compute t3-model term
+        nonlin3,uk6,E,EStar,F,FStar = t3ModelKdV(alpha,F_modes,G_modes,k,epsilon,u_full,uu,uuStar,uk3,A,AStar,B,BStar,C,CStar,DStar)
+        RHS = RHS + coeffs[2]*nonlin3[0:N]*t**(3*(1-tau))
+    
+    if (order == 4):
+        # compute t4-model term
+        nonlin4 = t4ModelKdV(alpha,F_modes,G_modes,k,epsilon,u_full,uu,uuStar,uk3,uk6,A,AStar,B,BStar,C,CStar,D,DStar,E,EStar,F,FStar)
+        RHS = RHS + coeffs[3]*nonlin4[0:N]*t**(4*(1-tau))
+
+    return RHS
+
+
+
+
+
+
+
+def runSim(params):
+    """
+    Runs an actual ROM or non-ROM simulation of KdV
+    
+    Parameters
+    ----------
+    params : Dictionary
+             Dictionary of relevant parameters (see below)
+        N : float, number of positive modes in simulation
+        M : float, number of positive modes in "full" intermediate compuation
+        alpha : float, degree of nonlinearity in KdV
+        epsilon : float, size of linear term (stiffness)
+        tau : float, time decay modifier
+        coeffs : Numpy array, renormalization coefficients for ROM (None if no ROM)
+        IC : function handle, initial condition of simulation
+        endtime : float, final time to simulate to
+        timesteps: Numpy array, specific timesteps for which to save solution
+
+        
+    Returns
+    -------
+    uSim : ODE solver output
+           Output solution from sp.integrate.solve_ivp (includes state vector at all timesteps, time vector, etc.)
+    """
+    
+    # unpack parameters from dictionary
+    N = params['N']
+    IC = params['IC']
+    endtime = params['endtime']
+    timesteps = params['timesteps']
+    
+    # generate initial condition
+    x = np.linspace(0,2*np.pi-2*np.pi/(2*N),2*N)
+    y = IC(x)
+    uFull = fftnorm(y)
+    u = uFull[0:N]
+    
+    # define RHS in form appropriate for solve_ivp
+    def myRHS(t,y):
+        out = RHSKdV(t,y,params)
+        return out
+    
+    # solve the IVP
+    uSim = sp.integrate.solve_ivp(fun = myRHS, t_span = [0,endtime], y0 = u,method = "BDF", t_eval = timesteps)
+    return uSim
+
+
 def diffuse(y_old, diff):
     y = copy.copy(y_old) #doesn't diffuse properly if we say y = y_old
     l = len(y_old)
