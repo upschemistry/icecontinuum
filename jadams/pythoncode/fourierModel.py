@@ -76,7 +76,41 @@ def convolution(nT,nu_kin,sigmastep,Nstar):
     convo = 2 * np.pi * Nstar * nu_kin * sigmastep * convo
     return convo
 
-def nTotRHS(nTot,nQLL,M,nu_kin,sigmastep):
+def nTotRHS(nQLL,nu_kin,sigmastep_FFT,k,D):
+    """Computes RHS of the ODE for the positive modes of Ntot
+    
+    dnk/dt = -k^2 D nkQLL + 2 pi FFT(sigma_m) nu_kin
+    
+    
+    Parameters
+    ----------
+    nQLL : 1D Numpy Array (N,)
+        Positive modes of state vector for quasi-liquid layers
+        
+    nu_kin : TBD
+        TBD
+        
+    sigmastep_FFT : TBD
+        TBD
+        
+    k : 1D Numpy Array (N,)
+        Vector of wavenumbers
+        
+    D : float
+        Diffusion coefficient
+
+    Returns
+    -------
+    dnTot : 1D Numpy Array (N,)
+        Rate of change of positive modes of nTot
+    """
+
+
+    dnTot = -k**2 * D * nQLL + 2*np.pi*nu_kin*sigmastep_FFT
+    
+    return dnTot
+
+def nQLLRHS(nTot,nQLL,nu_kin,sigmastep,k,D,Nstar,N):
     """Computes RHS of the ODE for the positive modes of Ntot
     
     dn0/dt = 2 * pi * sigma_m * nu_kin
@@ -86,34 +120,47 @@ def nTotRHS(nTot,nQLL,M,nu_kin,sigmastep):
     Parameters
     ----------
     nTot : 1D Numpy Array (N,)
-        Positive modes of state vector for total water layers
-        
+        Positive modes of state vector for total layers
+    
     nQLL : 1D Numpy Array (N,)
         Positive modes of state vector for quasi-liquid layers
         
-    alpha : float
-        Degree of nonlinearity in KdV
+    nu_kin : TBD
+        TBD
+        
+    sigmastep_FFT : TBD
+        TBD
+        
+    k : 1D Numpy Array (N,)
+        Vector of wavenumbers
+        
+    D : float
+        Diffusion coefficient
+        
+    Nstar : float
+        TBD
 
     Returns
     -------
-    nonlin0 : 1D Numpy Array (2*M,)
-        Nonlinear part of Markov term for given state vector
-        
-    u_full : 1D Numpy array (2*M,)
-        "full" state vector for use in later computations
+    dnQLL : 1D Numpy Array (N,)
+        Rate of change of positive modes of nTot
     """
     
     # construct full Fourier vector from only the positive modes
-    u_full = np.zeros(2*M) +1j*np.zeros(2*M)
-    u_full[0:u.shape[0]] = u
-    u_full[2*M-u.shape[0]+1:] = np.conj(np.flip(u[1:]))
+    nTotFull = np.zeros(2*N) + 1j*np.zeros(2*N)
+    nTotFull[0:N] = nTot
+    nTotFull[N+1:] = np.conj(np.flip(nTot[1:]))
     
-    # compute the convolution sum
-    nonlin0 = convolutionSumKdV(u_full,u_full,alpha)
-    return nonlin0,u_full
+    Ffull = fftnorm(sigmastep*ifftnorm(nTotFull)[0:N])
+    
+    F = Ffull[0:N]
+
+    dnQLL = -k**2 * D * nQLL + 2 * np.pi * Nstar * nu_kin * F
+    
+    return dnQLL
 
 
-def RHSKdV(t,u,params):
+def RHS(t,n,params):
     """
     Computes the RHS for a full KdV or ROM simulation. For use in solver.
     
@@ -122,73 +169,39 @@ def RHSKdV(t,u,params):
     t : float
         Current time
         
-    u : Numpy array (N,)
-        Current state vector
+    n : Numpy array (2N,)
+        Current state vector of positive modes (total first, then QLL)
               
     params : Dictionary
              Dictionary of relevant parameters (see below)
         N : float, number of positive modes in simulation
-        M : float, number of positive modes in "full" intermediate compuation
-        alpha : float, degree of nonlinearity in KdV
-        epsilon : float, size of linear term (stiffness)
-        tau : float, time decay modifier
-        coeffs : Numpy array, renormalization coefficients for ROM (None if no ROM)
+        nu_kin : 
+        sigmastep : 
+        sigmastep_FFT : 
+        k : 
 
         
     Returns
     -------
-    RHS : 1D Numpy array (N,)
+    RHS : 1D Numpy array (2N,)
           Derivative of each positive mode in state vector
     """
     
     # extract parameters from dictionary
     N = params['N']
-    M = params['M']
-    alpha = params['alpha']
-    epsilon = params['epsilon']
-    tau = params['tau']
-    coeffs = params['coeffs']
+    nu_kin = params['nu_kin']
+    sigmastep = params['sigmastep']
+    sigmastep_FFT = params['sigmastep_FFT']
+    k = params['k']
     
-    # construct wavenumber array
-    k = np.concatenate([np.arange(0,M),np.arange(-M,0)])
+    nTot = n[0:N]
+    nQLL = n[N:]
     
     
-    # Linear and Markov term
-    nonlin0,u_full = markovKdV(u,M,alpha)
-    RHS = 1j*k[0:N]**3*epsilon**2*u + nonlin0[0:N]
+    dnT = dnTot(nQLL,nu_kin,sigmastep_FFT,k,D)
+    dnQ = dnQLL(nTot,nQLL,nu_kin,sigmastep,k,D,Nstar,N)
     
-    if (np.any(coeffs == None)):
-        order = 0
-    else:
-        order = coeffs.shape[0]
-    
-    if (order >= 1):
-        # compute t-model term
-        
-        # define which modes are resolved / unresolved in full array
-        F_modes = np.concatenate([np.arange(0,N),np.arange(2*N-1,M+N+2),np.arange(2*M-N+1,2*M)])
-        G_modes = np.arange(N,2*M-N+1)
-    
-        # compute t-model term
-        nonlin1,uuStar = tModelKdV(u_full,nonlin0,alpha,F_modes)
-        RHS = RHS + coeffs[0]*nonlin1[0:N]*t**(1-tau)
-        
-        order = coeffs.shape[0]
-    
-    if (order >= 2):
-        # compute t2-model term
-        nonlin2,uk3,uu,A,AStar,B,BStar,C,CStar,D,DStar = t2ModelKdV(u_full,nonlin0,uuStar,alpha,F_modes,G_modes,k,epsilon)
-        RHS = RHS + coeffs[1]*nonlin2[0:N]*t**(2*(1-tau))
-    
-    if (order >= 3):
-        # compute t3-model term
-        nonlin3,uk6,E,EStar,F,FStar = t3ModelKdV(alpha,F_modes,G_modes,k,epsilon,u_full,uu,uuStar,uk3,A,AStar,B,BStar,C,CStar,DStar)
-        RHS = RHS + coeffs[2]*nonlin3[0:N]*t**(3*(1-tau))
-    
-    if (order == 4):
-        # compute t4-model term
-        nonlin4 = t4ModelKdV(alpha,F_modes,G_modes,k,epsilon,u_full,uu,uuStar,uk3,uk6,A,AStar,B,BStar,C,CStar,D,DStar,E,EStar,F,FStar)
-        RHS = RHS + coeffs[3]*nonlin4[0:N]*t**(4*(1-tau))
+    RHS = np.concatenate((nTot,nQLL))
 
     return RHS
 
