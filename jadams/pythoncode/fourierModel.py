@@ -43,7 +43,7 @@ def ifftnorm(u_full):
     normalizedIFFT = np.real(np.fft.ifft(u_full)*N)
     return normalizedIFFT
 
-def convolution(nT,vKin,sigmaM,Nstar):
+def convolution(nT,nu_kin,sigmastep,Nstar):
     """Computes Fourier transform of the nonlinear term in the QLL PDE
     
     2 pi N^* sigmaM vKin cos(Ntot)
@@ -56,7 +56,10 @@ def convolution(nT,vKin,sigmaM,Nstar):
     nT : 1D Numpy Array (N,)
         Total water layers
         
-    vKin : TBD
+    nu_kin : TBD
+        TBD
+        
+    sigmastep : TBD
         TBD
         
     Nstar : TBD
@@ -69,27 +72,24 @@ def convolution(nT,vKin,sigmaM,Nstar):
     """
     
     # compute double sum in real space, then apply scalar multiplier
-    convo = fftnorm(np.cos(ifftnorm(nT))
-    convo = 2 * np.pi * Nstar * vKin * sigmaM * convo
+    convo = fftnorm(np.cos(ifftnorm(nT)))
+    convo = 2 * np.pi * Nstar * nu_kin * sigmastep * convo
     return convo
 
-def markovKdV(u,M,alpha):
-    """Computes nonlinear part of Markov term in KdV
+def nTotRHS(nTot,nQLL,M,nu_kin,sigmastep):
+    """Computes RHS of the ODE for the positive modes of Ntot
     
-    C_k(u,v) = -(alpha * 1i * k) / 2 * sum_{i+j = k} u_i v_j
+    dn0/dt = 2 * pi * sigma_m * nu_kin
+    dnk/dt = -k^2 D nkQLL
     
-    where the sum of i and j is over a "full" system with M positive modes (user specified)
-    
-    Computed in real space to avoid loops and then converted back
-    to Fourier space.
     
     Parameters
     ----------
-    u : 1D Numpy Array (N,)
-        Positive modes of state vector whose RHS is being computed
+    nTot : 1D Numpy Array (N,)
+        Positive modes of state vector for total water layers
         
-    M : int
-        Number of positive modes in "full" model for intermediary calculations
+    nQLL : 1D Numpy Array (N,)
+        Positive modes of state vector for quasi-liquid layers
         
     alpha : float
         Degree of nonlinearity in KdV
