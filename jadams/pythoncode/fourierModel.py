@@ -5,6 +5,7 @@ Created on Tue Jul 14 15:01:47 2015
 @author: nesh, jonathan
 """
 import numpy as np
+import scipy as sp
 import copy
 
 def fftnorm(u_full):
@@ -179,6 +180,7 @@ def RHS(t,n,params):
         sigmastep : 
         sigmastep_FFT : 
         k : 
+        D : 
 
         
     Returns
@@ -193,15 +195,16 @@ def RHS(t,n,params):
     sigmastep = params['sigmastep']
     sigmastep_FFT = params['sigmastep_FFT']
     k = params['k']
+    D = params['D']
     
     nTot = n[0:N]
     nQLL = n[N:]
     
     
-    dnT = dnTot(nQLL,nu_kin,sigmastep_FFT,k,D)
-    dnQ = dnQLL(nTot,nQLL,nu_kin,sigmastep,k,D,Nstar,N)
+    dnT = nTotRHS(nQLL,nu_kin,sigmastep_FFT,k,D)
+    dnQ = nQLLRHS(nTot,nQLL,nu_kin,sigmastep,k,D)
     
-    RHS = np.concatenate((nTot,nQLL))
+    RHS = np.concatenate((dnT,dnQ))
 
     return RHS
 
@@ -220,14 +223,11 @@ def runSim(params):
     params : Dictionary
              Dictionary of relevant parameters (see below)
         N : float, number of positive modes in simulation
-        M : float, number of positive modes in "full" intermediate compuation
-        alpha : float, degree of nonlinearity in KdV
-        epsilon : float, size of linear term (stiffness)
-        tau : float, time decay modifier
-        coeffs : Numpy array, renormalization coefficients for ROM (None if no ROM)
-        IC : function handle, initial condition of simulation
-        endtime : float, final time to simulate to
-        timesteps: Numpy array, specific timesteps for which to save solution
+        nu_kin : 
+        sigmastep : 
+        sigmastep_FFT : 
+        k : 
+        D : 
 
         
     Returns
@@ -238,23 +238,23 @@ def runSim(params):
     
     # unpack parameters from dictionary
     N = params['N']
-    IC = params['IC']
+    ICNT = params['ICNT']
+    ICNQLL = params['ICNQLL']
     endtime = params['endtime']
     timesteps = params['timesteps']
     
-    # generate initial condition
-    x = np.linspace(0,2*np.pi-2*np.pi/(2*N),2*N)
-    y = IC(x)
-    uFull = fftnorm(y)
-    u = uFull[0:N]
+    nTotIC = fftnorm(ICNT)[0:N]
+    nQLLIC = fftnorm(ICNQLL)[0:N]
+    
+    n = np.concatenate((nTotIC,nQLLIC))
     
     # define RHS in form appropriate for solve_ivp
     def myRHS(t,y):
-        out = RHSKdV(t,y,params)
+        out = RHS(t,y,params)
         return out
     
     # solve the IVP
-    uSim = sp.integrate.solve_ivp(fun = myRHS, t_span = [0,endtime], y0 = u,method = "BDF", t_eval = timesteps)
+    uSim = sp.integrate.solve_ivp(fun = myRHS, t_span = [0,endtime], y0 = n, t_eval = timesteps)
     return uSim
 
 
