@@ -2,13 +2,12 @@ from time import time
 import numpy as np
 
 """
-Performance testing functions for the ice model rolled into an importable module.
+Performance testing functions for the ice model.
 @author: Max B
 """
 
-
 #Meta testing parameters
-def multiple_test_avg_time(func, args, n_tests = 50, **kwargs):
+def multiple_test_avg_time(func, args, n_tests = 50):
     """
     Test a function n_tests times and return the average time taken for the function.
     """
