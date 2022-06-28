@@ -87,14 +87,14 @@ def f0d(y, t, float_params, niter):
     derivs = np.array([dFliq0_dt, dNtot_dt])
     return derivs
 
-@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])")#, parallel = True) # in the current use case it is faster without paralellization (requires use of prange instead of range)
+@njit("f8[:](f8[:],f8,f8[:],i8[:],f8[:])")#, parallel = True) # in the current use case it is faster without paralellization (requires use of prange instead of range)
 def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
      # unpack parameters
     Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
     niter, nx = int_params
 
     # unpack current values of y
-    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(types.int32(2),nx))
+    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(2,nx))
     
     # Deposition
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
