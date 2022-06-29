@@ -21,9 +21,8 @@ def fftnorm(u_full):
     normalizedFFT : 1D Numpy Array (N,)
         The transformed version of that vector
     """
-    
-    N = u_full.shape[0]
-    normalizedFFT = np.fft.fft(u_full)*1/N
+
+    normalizedFFT = np.fft.rfft(u_full,norm = "forward")
     return normalizedFFT
 
 def ifftnorm(u_full):
@@ -40,8 +39,8 @@ def ifftnorm(u_full):
         The transformed version of that vector
     """
     
-    N = u_full.shape[0]
-    normalizedIFFT = np.real(np.fft.ifft(u_full)*N)
+
+    normalizedIFFT = np.fft.irfft(u_full)
     return normalizedIFFT
 
 def convolution(nT,nu_kin,sigmastep,Nstar):
@@ -147,14 +146,8 @@ def nQLLRHS(nTot,nQLL,nu_kin,sigmastep,k,D,Nstar,N):
         Rate of change of positive modes of nTot
     """
     
-    # construct full Fourier vector from only the positive modes
-    nTotFull = np.zeros(2*N) + 1j*np.zeros(2*N)
-    nTotFull[0:N] = nTot
-    nTotFull[N+1:] = np.conj(np.flip(nTot[1:]))
     
-    Ffull = fftnorm(sigmastep*ifftnorm(nTotFull)[0:N])
-    
-    F = Ffull[0:N]
+    F = fftnorm(sigmastep*ifftnorm(nTot))
 
     dnQLL = -k**2 * D * nQLL + 2 * np.pi * Nstar * nu_kin * F
     
@@ -256,6 +249,23 @@ def runSim(params):
     # solve the IVP
     uSim = sp.integrate.solve_ivp(fun = myRHS, t_span = [0,endtime], y0 = n, t_eval = timesteps)
     return uSim
+
+def makeReal(fourierSol):
+    
+    N = fourierSol.shape[0]
+    timesteps = fourierSol.shape[1]
+    
+    NTot = np.zeros((timesteps,2*N))
+    NQLL = np.zeros((timesteps,2*N))
+    
+    for i in np.range(timesteps):
+        nTot = fourierSol[0:N,i]
+        nQLL = fourierSol[N:,i]
+        
+        NTot[i,:] = ifftnorm(nTot)
+        NQLL[i,:] = ifftnorm(nQLL)
+        
+    return [NTot, NQLL]
 
 
 def diffuse(y_old, diff):
