@@ -122,7 +122,7 @@ def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
     return derivs
 
 @njit(float64[:](float64[:],float64,float64,float64,types.unicode_type))
-def getsigmastep(x,xmax,center_reduction,sigmastepmax,method='sinusoid'):
+def getsigmastep(x,xmax,center_reduction,sigmastepmax,method='parabolic'):
     sigmapfac = 1-center_reduction/100 #float64
     xmid = max(x)/2 #float64
     if method == 'sinusoid':
