@@ -2,10 +2,11 @@
 """
 Created on Tue Jul 14 15:01:47 2015
 
-@author: nesh, jonathan
+@author: nesh, jonathan, jake
 """
 import numpy as np
 import scipy as sp
+import matplotlib.pyplot as plt
 #import copy
 #from numba import njit,prange
 
@@ -41,7 +42,7 @@ def ifftnorm(u_full):
     """
     
 
-    normalizedIFFT = np.fft.irfft(u_full)
+    normalizedIFFT = np.fft.irfft(u_full, norm = "forward")
     return normalizedIFFT
 
 def convolution(nT,nu_kin,sigmastep,Nstar):
@@ -73,8 +74,7 @@ def convolution(nT,nu_kin,sigmastep,Nstar):
     """
     
     # compute double sum in real space, then apply scalar multiplier
-    convo = fftnorm(np.cos(ifftnorm(nT)))
-    convo = 2 * np.pi * Nstar * nu_kin * sigmastep * convo
+    convo = 2 * np.pi * Nstar * nu_kin * fftnorm(sigmastep * np.cos(ifftnorm(nT)))
     return convo
 
 #@njit("f8[:](f8[:],i4,f8[:],f8[:],f8)")
@@ -106,9 +106,6 @@ def nTotRHS(nQLL,nu_kin,sigmastep_FFT,k,D):
     dnTot : 1D Numpy Array (N,)
         Rate of change of positive modes of nTot
     """
-
-    #print(type(nQLL),type(nu_kin),type(sigmastep_FFT),type(k),type(D)) #print types of parameters
-    #print(nQLL.shape,"INT",sigmastep_FFT.shape,k.shape,"Flo0at")       #print shapes of parameters
 
     dnTot = -k**2 * D * nQLL + 2*np.pi*nu_kin*sigmastep_FFT
     
@@ -150,10 +147,9 @@ def nQLLRHS(nTot,nQLL,nu_kin,sigmastep,k,D,Nstar,N):
         Rate of change of positive modes of nTot
     """
     
-    
-    F = fftnorm(sigmastep*ifftnorm(nTot))
+    convo = convolution(nTot,nu_kin,sigmastep, Nstar)
 
-    dnQLL = -k**2 * D * nQLL + 2 * np.pi * Nstar * nu_kin * F
+    dnQLL = -k**2 * D * nQLL + convo
     
     return dnQLL
 
@@ -208,7 +204,7 @@ def RHS(t,n,params):
 
 def runSim(params):
     """
-    Runs an actual ROM or non-ROM simulation of KdV
+    Runs a simulation of the ice continuum in Fourier space
     
     Parameters
     ----------
