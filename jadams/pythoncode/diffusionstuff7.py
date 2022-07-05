@@ -5,10 +5,7 @@ Created on Tue Jul 14 15:01:47 2015
 @author: nesh, jonathan, Max
 """
 import numpy as np
-from numba import njit, float64,types
-
-#NOTE: as of june 20 2022, the only functions that are used in continuum_model6 
-#       are those with explicit type signatures.
+from numba import njit, float64, types
 
 @njit("f8[:](f8[:],f8[:],f8,f8)") #important
 def fqll_next_array(fqll_last,Ntot,Nstar,Nbar):
@@ -71,6 +68,7 @@ def getdNliq_dNtot(Ntot,Nstar,Nbar,niter):
 
 @njit("f8[:](f8[:],f8,f8[:],i8)") #float_params is a list not an array
 def f0d(y, t, float_params, niter):
+    """ odeint function for the zero-dimensional ice model """
     Nbar, Nstar, sigmastepmax, sigma0, deprate = float_params  # unpack parameters
     
     Fliq0, Ntot0 = y   # unpack current values of y
@@ -90,6 +88,7 @@ def f0d(y, t, float_params, niter):
 #array(float64, 1d, C), float64, array(float64, 1d, C), array(int32, 1d, C), array(float64, 1d, C)
 @njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])")#, parallel = True) # in the current use case it is faster without paralellization (requires use of prange instead of range)
 def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
+    """ odeint function for the one-dimensional ice model """
      # unpack parameters
     Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
     niter, nx = int_params
@@ -119,6 +118,40 @@ def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
 
     # Package for output
     derivs = np.reshape(np.array([[*dFliq0_dt], [*dNtot_dt]]),2*nx) #need to unpack lists back into arrays of proper shape (2,nx) before reshaping
+    return derivs
+
+def f2d(y, t, float_params, int_params, sigmastep):
+    """ 2D version of f1d """
+    #TODO: implement
+    # unpack parameters
+    Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
+    niter, nx = int_params
+
+    # unpack current values of y
+    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(types.int32(2),types.int32(nx)))
+    
+    # Deposition
+    delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
+    sigD = (sigmastep - delta * sigma0)/(1+delta*sigma0)
+    depsurf = deprate * sigD
+    dFliq0_dt = getdNliq_dNtot_array(Ntot0,Nstar,Nbar,niter)*depsurf
+    dNtot_dt = depsurf
+
+    # Diffusion
+    l = len(Fliq0)
+    dy = np.zeros((l,))#np.shape(Fliq0))
+    for i in range(0,l):#(1,l-1):
+        dy[i] = DoverdeltaX2*(Fliq0[i+1]-2*Fliq0[i]+Fliq0[i-1])
+        # Boundary Conditions (periodic at ends)
+        dy[0] = DoverdeltaX2*(Fliq0[1]-2*Fliq0[0]+Fliq0[l-1]) 
+        dy[l-1] = DoverdeltaX2*(Fliq0[0]-2*Fliq0[l-1]+Fliq0[l-2])
+     
+    # Combined
+    dFliq0_dt += dy
+    dNtot_dt += dy
+
+    # Package for output
+    derivs = np.reshape(np.array([[*dFliq0_dt], [*dNtot_dt]]),2*nx) #need
     return derivs
 
 @njit(float64[:](float64[:],float64,float64,float64,types.unicode_type))
