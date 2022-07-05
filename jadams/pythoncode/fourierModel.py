@@ -56,15 +56,15 @@ def convolution(nT,nu_kin,sigmastep,Nstar):
     nT : 1D Numpy Array (N,)
         Total water layers
         
-    nu_kin : TBD
-        TBD
+    nu_kin : float
+        See documentation of nQLLRHS in this document
         
-    sigmastep : TBD
-        TBD
+    sigmastep : 1D Numpy Array (N,)
+        See documentation of nQLLRHS in this document
         
-    Nstar : TBD
-        TBD
-
+    Nstar : Float
+        See documentation of nQLLRHS in this document
+        
     Returns
     -------
     convo : 1D Numpy Array (N,)
@@ -87,12 +87,12 @@ def nTotRHS(nQLL,nu_kin,sigmastep_FFT,k,D):
     nQLL : 1D Numpy Array (N,)
         Positive modes of state vector for quasi-liquid layers
         
-    nu_kin : TBD
-        TBD
+    nu_kin : float
+        See documentation of nQLLRHS in this document
         
-    sigmastep_FFT : TBD
-        TBD
-        
+    sigmastep : 1D Numpy Array (N,)
+        See documentation of nQLLRHS in this document
+                
     k : 1D Numpy Array (N,)
         Vector of wavenumbers
         
@@ -125,11 +125,13 @@ def nQLLRHS(nTot,nQLL,nu_kin,sigmastep,k,D,Nstar,N):
     nQLL : 1D Numpy Array (N,)
         Positive modes of state vector for quasi-liquid layers
         
-    nu_kin : TBD
-        TBD
+    nu_kin : float
+        Kinetic growth velocity; see Eq. (2) of Neshyba et al 2015.
         
-    sigmastep_FFT : TBD
-        TBD
+    sigmastep : 1D Numpy Array (N,)
+        Supersaturation of air above the ice surface using microsurface I as the reference
+        (e.g., sigmastep=0.2 => microsurface I would be 20% supersaturated); corresponds to "sigmaI" of
+        Neshyba et al, 2015 (e.g., Eq. (12)).
         
     k : 1D Numpy Array (N,)
         Vector of wavenumbers
@@ -138,7 +140,8 @@ def nQLLRHS(nTot,nQLL,nu_kin,sigmastep,k,D,Nstar,N):
         Diffusion coefficient
         
     Nstar : float
-        TBD
+        Amplitude of the quasi-liquid layer thickness variation between microsurface
+        I (thinnest) and microsurface II (thickest); see Eq. (3) of Neshyba et al 2015.
 
     Returns
     -------
@@ -200,9 +203,6 @@ def RHS(t,n,params):
     RHS = np.concatenate((dnT,dnQ))
 
     return RHS
-
-
-
 
 
 
