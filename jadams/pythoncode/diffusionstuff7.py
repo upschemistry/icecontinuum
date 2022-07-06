@@ -106,7 +106,7 @@ def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
     # Diffusion
     l = len(Fliq0)
     dy = np.zeros((l,))#np.shape(Fliq0))
-    for i in range(0,l):#(1,l-1):
+    for i in range(0,l-1):#(1,l-1):
         dy[i] = DoverdeltaX2*(Fliq0[i+1]-2*Fliq0[i]+Fliq0[i-1])
         # Boundary Conditions (periodic at ends)
         dy[0] = DoverdeltaX2*(Fliq0[1]-2*Fliq0[0]+Fliq0[l-1]) 
