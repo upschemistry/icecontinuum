@@ -45,7 +45,7 @@ def ifftnorm(u_full):
     normalizedIFFT = np.fft.irfft(u_full, norm = "forward")
     return normalizedIFFT
 
-def convolution(nT,nu_kin,sigmastep,Nstar):
+def convolution(nT,nu_kin,depRate,Nstar):
     """Computes Fourier transform of the nonlinear term in the QLL PDE
     
     2 pi N^* sigmaM vKin cos(Ntot)
@@ -74,11 +74,11 @@ def convolution(nT,nu_kin,sigmastep,Nstar):
     """
     
     # compute double sum in real space, then apply scalar multiplier
-    convo = 2 * np.pi * Nstar * nu_kin * fftnorm(sigmastep * np.cos(ifftnorm(nT)))
+    convo = 2 * np.pi * Nstar * nu_kin * fftnorm(depRate * np.cos(ifftnorm(nT)))
     return convo
 
 #@njit("f8[:](f8[:],i4,f8[:],f8[:],f8)")
-def nTotRHS(nQLL,nu_kin,sigmastep_FFT,k,D):
+def nTotRHS(nQLL,nu_kin,depRate_FFT,k,D):
     """Computes RHS of the ODE for the positive modes of Ntot
     
     dnk/dt = -k^2 D nkQLL + 2 pi FFT(sigma_m) nu_kin
@@ -107,11 +107,11 @@ def nTotRHS(nQLL,nu_kin,sigmastep_FFT,k,D):
         Rate of change of positive modes of nTot
     """
 
-    dnTot = -k**2 * D * nQLL + 2*np.pi*nu_kin*sigmastep_FFT
+    dnTot = -k**2 * D * nQLL + depRate_FFT
     
     return dnTot
 
-def nQLLRHS(nTot,nQLL,nu_kin,sigmastep,k,D,Nstar,N):
+def nQLLRHS(nTot,nQLL,nu_kin,depRate,k,D,Nstar,N):
     """Computes RHS of the ODE for the positive modes of Ntot
     
     dn0/dt = 2 * pi * sigma_m * nu_kin
@@ -147,7 +147,7 @@ def nQLLRHS(nTot,nQLL,nu_kin,sigmastep,k,D,Nstar,N):
         Rate of change of positive modes of nTot
     """
     
-    convo = convolution(nTot,nu_kin,sigmastep, Nstar)
+    convo = convolution(nTot,nu_kin,depRate, Nstar)
 
     dnQLL = -k**2 * D * nQLL + convo
     
@@ -185,8 +185,8 @@ def RHS(t,n,params):
     # extract parameters from dictionary
     N = params['N']
     nu_kin = params['nu_kin']
-    sigmastep = params['sigmastep']
-    sigmastep_FFT = params['sigmastep_FFT']
+    depRate = params['depRate']
+    depRate_FFT = params['depRate_FFT']
     k = params['k']
     D = params['D']
     Nstar = params['Nstar']
@@ -195,8 +195,8 @@ def RHS(t,n,params):
     nQLL = n[N:]
     
     
-    dnT = nTotRHS(nQLL,nu_kin,sigmastep_FFT,k,D)
-    dnQ = nQLLRHS(nTot,nQLL,nu_kin,sigmastep,k,D,Nstar,N)
+    dnT = nTotRHS(nQLL,nu_kin,depRate_FFT,k,D)
+    dnQ = nQLLRHS(nTot,nQLL,nu_kin,depRate,k,D,Nstar,N)
     
     RHS = np.concatenate((dnT,dnQ))
 
