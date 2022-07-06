@@ -19,14 +19,14 @@ def fqll_next(fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
     return 1 + fstar*np.sin(2*np.pi*(Ntot-Nbar*fqll_last))
 
-@njit("f8[:](f8[:],f8,f8,i8)") #Ntot is ndarray of numbers (ints, become floats), Nstar and Nbar are floats, niter is an int literal
+@njit("f8[:](f8[:],f8,f8,i4)") #Ntot is ndarray of numbers (ints, become floats), Nstar and Nbar are floats, niter is an int literal
 def getNliq_array(Ntot,Nstar,Nbar,niter):
     fqll_last = np.array([1.0])
     for i in range(niter):
         fqll_last = fqll_next_array(fqll_last,Ntot,Nstar,Nbar)
     return fqll_last*Nbar
 
-@njit("f8(f8,f8,f8,i8)") #Ntot is float in this case, Nstar and Nbar are floats, niter is an int literal
+@njit("f8(f8,f8,f8,i4)") #Ntot is float in this case, Nstar and Nbar are floats, niter is an int literal
 def getNliq(Ntot,Nstar,Nbar,niter):
     fqll_last = 1.0
     for i in range(niter):
@@ -48,7 +48,7 @@ def getdfqll_dNtot_next_array(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
     return fstar*np.cos(2*np.pi*(Ntot-fqll_last))*2*np.pi*(1-Nbar*dfqll_dNtot_last)
 
-@njit("f8[:](f8[:],f8,f8,i8)")
+@njit("f8[:](f8[:],f8,f8,i4)")
 def getdNliq_dNtot_array(Ntot,Nstar,Nbar,niter):
     dfqll_dNtot_last = np.array([0.0])
     fqll_last = np.array([1.0])
@@ -57,7 +57,7 @@ def getdNliq_dNtot_array(Ntot,Nstar,Nbar,niter):
         fqll_last = fqll_next_array(fqll_last,Ntot,Nstar,Nbar)
     return dfqll_dNtot_last*Nbar 
 
-@njit("f8(f8,f8,f8,i8)")
+@njit("f8(f8,f8,f8,i4)")
 def getdNliq_dNtot(Ntot,Nstar,Nbar,niter):
     dfqll_dNtot_last = 0.0
     fqll_last = 1.0
@@ -66,7 +66,7 @@ def getdNliq_dNtot(Ntot,Nstar,Nbar,niter):
         fqll_last = fqll_next(fqll_last,Ntot,Nstar,Nbar)
     return dfqll_dNtot_last*Nbar 
 
-@njit("f8[:](f8[:],f8,f8[:],i8)") #float_params is a list not an array
+@njit("f8[:](f8[:],f8,f8[:],i4)")
 def f0d(y, t, float_params, niter):
     """ odeint function for the zero-dimensional ice model """
     Nbar, Nstar, sigmastepmax, sigma0, deprate = float_params  # unpack parameters
@@ -85,8 +85,7 @@ def f0d(y, t, float_params, niter):
     derivs = np.array([dFliq0_dt, dNtot_dt])
     return derivs
 
-#array(float64, 1d, C), float64, array(float64, 1d, C), array(int32, 1d, C), array(float64, 1d, C)
-@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])")#, parallel = True) # in the current use case it is faster without paralellization (requires use of prange instead of range)
+@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])")#, parallel = True)
 def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
     """ odeint function for the one-dimensional ice model """
      # unpack parameters
@@ -120,6 +119,7 @@ def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
     derivs = np.reshape(np.array([[*dFliq0_dt], [*dNtot_dt]]),2*nx) #need to unpack lists back into arrays of proper shape (2,nx) before reshaping
     return derivs
 
+@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])")
 def f2d(y, t, float_params, int_params, sigmastep):
     """ 2D version of f1d """
     #TODO: implement
@@ -158,10 +158,12 @@ def f2d(y, t, float_params, int_params, sigmastep):
 def getsigmastep(x,xmax,center_reduction,sigmastepmax,method='parabolic'):
     sigmapfac = 1-center_reduction/100 #float64
     xmid = max(x)/2 #float64
-    if method == 'sinusoid':
-        fsig = (np.cos(x/xmax*np.pi*2)+1)/2*(1-sigmapfac)+sigmapfac
-    elif method == 'parabolic':
-        fsig = (x-xmid)**2/xmid**2*(1-sigmapfac)+sigmapfac
-    else:
+    try:
+        if method == 'sinusoid':
+            fsig = (np.cos(x/xmax*np.pi*2)+1)/2*(1-sigmapfac)+sigmapfac
+        elif method == 'parabolic':
+            fsig = (x-xmid)**2/xmid**2*(1-sigmapfac)+sigmapfac
+    except:
         print('bad method')
+
     return fsig*sigmastepmax

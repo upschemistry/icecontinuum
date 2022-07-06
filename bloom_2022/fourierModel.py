@@ -8,7 +8,7 @@ import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
 #import copy
-#from numba import njit,prange
+from numba import njit,prange
 
 def fftnorm(u_full):
     """Computes normalized FFT (such that FFT and IFFT are symmetrically normalized)
