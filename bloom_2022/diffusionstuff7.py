@@ -85,6 +85,17 @@ def f0d(y, t, float_params, niter):
     derivs = np.array([dFliq0_dt, dNtot_dt])
     return derivs
 
+@njit("f8[:](f8[:],f8)")
+def diffuse_1d(Fliq0,DoverdeltaX2):
+    l = len(Fliq0)
+    dy = np.zeros((l,))#np.shape(Fliq0))
+    for i in range(0,l):#(1,l-1):
+        dy[i] = DoverdeltaX2*(Fliq0[i+1]-2*Fliq0[i]+Fliq0[i-1])
+        # Boundary Conditions (periodic at ends)
+        dy[0] = DoverdeltaX2*(Fliq0[1]-2*Fliq0[0]+Fliq0[l-1]) 
+        dy[l-1] = DoverdeltaX2*(Fliq0[0]-2*Fliq0[l-1]+Fliq0[l-2])
+    return dy
+
 @njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])")#, parallel = True)
 def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
     """ odeint function for the one-dimensional ice model """
@@ -119,16 +130,42 @@ def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
     derivs = np.reshape(np.array([[*dFliq0_dt], [*dNtot_dt]]),2*nx) #need to unpack lists back into arrays of proper shape (2,nx) before reshaping
     return derivs
 
-@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])")
-def f2d(y, t, float_params, int_params, sigmastep):
+@njit("f8[:,:](f8[:,:],f8)")
+def diffuse_2d(Fliq0,D):
+    """ Applies numerical solution to find diffusive effects at each time step.
+    
+    Parameters
+    ----------
+    Fliq0 : 2D Numpy Array 
+        The thickness of the liquid over a 2D area
+
+    D : float64
+        Diffusion coefficient
+
+    Returns
+    -------
+    dy : 2D Numpy Array
+        The change to the thickness of the liquid at each point in the 2d area over
+         the time step
+    """
+    s = np.shape(Fliq0)
+    dy = np.zeros(s) 
+    for i in range(0,s[1]): #go across the liquid, from top to bottom
+        dy[i,:] = diffuse_1d(Fliq0[i,:],D)#calculate left to right at each row 
+        for j in range(0,s[0]): # for each row, calculate the effects on rows below it
+            dy[:,j] = diffuse_1d(Fliq0[:,j],D)
+    #NOTE: 1d func manages periodic boundary conditions
+    return dy
+
+@njit("f8[:,:](f8[:,:],f8,f8[:],i4[:],f8[:])")
+def f2d(ys, t, float_params, int_params, sigmastep):
     """ 2D version of f1d """
-    #TODO: implement
     # unpack parameters
     Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
     niter, nx = int_params
 
     # unpack current values of y
-    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(types.int32(2),types.int32(nx)))
+    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(ys),(types.int32(2),(types.int32(nx),types.int32(nx))))
     
     # Deposition
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
@@ -138,13 +175,7 @@ def f2d(y, t, float_params, int_params, sigmastep):
     dNtot_dt = depsurf
 
     # Diffusion
-    l = len(Fliq0)
-    dy = np.zeros((l,))#np.shape(Fliq0))
-    for i in range(0,l):#(1,l-1):
-        dy[i] = DoverdeltaX2*(Fliq0[i+1]-2*Fliq0[i]+Fliq0[i-1])
-        # Boundary Conditions (periodic at ends)
-        dy[0] = DoverdeltaX2*(Fliq0[1]-2*Fliq0[0]+Fliq0[l-1]) 
-        dy[l-1] = DoverdeltaX2*(Fliq0[0]-2*Fliq0[l-1]+Fliq0[l-2])
+    dy = diffuse_1d(Fliq0,DoverdeltaX2)
      
     # Combined
     dFliq0_dt += dy
