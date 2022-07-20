@@ -211,7 +211,7 @@ def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
     niter, nx = int_params
 
     # unpack current values of y
-    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(2,500))
+    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(2,nx))
     
     # Deposition
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
