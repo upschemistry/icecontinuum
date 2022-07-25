@@ -42,7 +42,8 @@ def getNliq_array(Ntot,Nstar,Nbar,niter):
 
 @njit("f8[:,:](f8[:,:],f8,f8,i4)") #Ntot is ndarray of numbers (ints, become floats), Nstar and Nbar are floats, niter is an int literal
 def getNliq_2d_array(Ntot,Nstar,Nbar,niter):
-    fqll_last = np.ones((len(Ntot),len(Ntot)))
+    """ Ntot is the ice- this returns the liquid layer prequilibrated to 1 bilayer equivlaent"""
+    fqll_last = np.ones(np.shape(Ntot))
     for i in range(niter):
         fqll_last = fqll_next_2d_array(fqll_last,Ntot,Nstar,Nbar)
     return fqll_last*Nbar
@@ -62,33 +63,38 @@ def getdfqll_dNtot_next_array(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
     return fstar*np.cos(2*np.pi*(Ntot-fqll_last))*2*np.pi*(1-Nbar*dfqll_dNtot_last)
 
-@njit("f8[:](f8[:],f8[:],f8[:],f8,f8)") #quirk: fqll_last is a float but must be array for above implemenetation
+@njit("f8[:,:](f8[:,:],f8[:,:],f8[:,:],f8,f8)") #quirk: fqll_last is a float but must be array for above implemenetation
 def getdfqll_dNtot_next_2d_array(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
     return fstar*np.cos(2*np.pi*(Ntot-fqll_last))*2*np.pi*(1-Nbar*dfqll_dNtot_last)
 
+@njit("f8(f8,f8,f8,i4)")
+def getdNliq_dNtot(Ntot,Nstar,Nbar,niter):
+    dfqll_dNtot_last = 0.0
+    fqll_last = 1.0
+    for i in range(niter):
+        dfqll_dNtot_last = getdfqll_dNtot_next(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar)
+        fqll_last = fqll_next(fqll_last,Ntot,Nstar,Nbar)
+    return dfqll_dNtot_last*Nbar 
+
 @njit("f8[:,:](f8[:,:],f8,f8,i4)")
 def getdNliq_dNtot_2d_array(Ntot,Nstar,Nbar,niter):
-    dfqll_dNtot_last = np.array([0.0])
-    fqll_last = np.array([1.0])
+    s = np.shape(Ntot)
+    dfqll_dNtot_last = np.zeros(s) #np.array([0.0])
+    fqll_last = np.ones(s) #np.array([1.0])
+
     for i in range(niter):
         dfqll_dNtot_last = getdfqll_dNtot_next_2d_array(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar)
         fqll_last = fqll_next_2d_array(fqll_last,Ntot,Nstar,Nbar)
     return dfqll_dNtot_last*Nbar 
 
-@njit("f8[:](f8[:],f8[:],f8,f8)") #important
-def fqll_next_2d_array(fqll_last,Ntot,Nstar,Nbar):
-    #Ntot is a list of the amount of each type of ice
-    fstar = Nstar/Nbar
-    return 1 + fstar*np.sin(2*np.pi*(Ntot-Nbar*fqll_last))
-
 @njit("f8[:](f8[:],f8,f8,i4)")
-def getdNliq_dNtot_2d_array(Ntot,Nstar,Nbar,niter):
+def getdNliq_dNtot_array(Ntot,Nstar,Nbar,niter):
     dfqll_dNtot_last = np.array([0.0])
     fqll_last = np.array([1.0])
     for i in range(niter):
-        dfqll_dNtot_last = getdfqll_dNtot_next_2d_array(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar)
-        fqll_last = fqll_next_2d_array(fqll_last,Ntot,Nstar,Nbar)
+        dfqll_dNtot_last = getdfqll_dNtot_next_array(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar)
+        fqll_last = fqll_next_array(fqll_last,Ntot,Nstar,Nbar)
     return dfqll_dNtot_last*Nbar 
 
 @njit("f8[:](f8[:],f8,f8[:],i4)")
@@ -182,32 +188,37 @@ def diffuse_2d(Fliq0,D):
     #NOTE: 1d func manages periodic boundary conditions
     return dy
 
-@njit("f8[:,:](f8[:,:],f8,f8[:],i4[:],f8[:])")
-def f2d(ys, t, float_params, int_params, sigmastep):#NOTE: sigmastep needs to become 2D -- rotate parabola around vertical axis
+@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])")
+def f2d(y, t, float_params, int_params, sigmastep):#NOTE: sigmastep needs to become 2D -- rotate parabola around vertical axis
     """ 2D version of f1d """
     # unpack parameters
     Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
-    niter, nx = int_params
+    niter, nx, ny = int_params
+
 
     # unpack current values of y
-    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(ys),(types.int32(2),types.int32(nx),types.int32(nx)))
+    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(types.int32(2),types.int32(nx),types.int32(ny)))
     
     # Deposition
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
     sigD = (sigmastep - delta * sigma0)/(1+delta*sigma0)
     depsurf = deprate * sigD
-    dFliq0_dt = getdNliq_dNtot_array(Ntot0,Nstar,Nbar,niter)*depsurf
+    dFliq0_dt = getdNliq_dNtot_2d_array(Ntot0,Nstar,Nbar,niter)*depsurf
     dNtot_dt = depsurf
 
     # Diffusion
-    dy = diffuse_1d(Fliq0,DoverdeltaX2)
+    dy = diffuse_2d(Fliq0,DoverdeltaX2)
      
     # Combined
     dFliq0_dt += dy
     dNtot_dt += dy
 
     # Package for output
-    derivs = np.reshape(np.array([[*dFliq0_dt], [*dNtot_dt]]),2*nx) #need
+    #derivs = np.reshape([dFliq0_dt, dNtot_dt],(2,nx,nx) ) #np.reshape(np.array([[*dFliq0_dt], [*dNtot_dt]]),2*nx) #need
+    ## NOTE: this is not it   -- ##### #derivs = np.reshape(np.ascontiguousarray((np.concatenate((dFliq0_dt,dNtot_dt),axis=0))),(types.int32(2),types.int32(nx))) #NOTE: two arrays(of size nx) containing arrays (also size nx)
+
+   # derivs = np.reshape(np.ascontiguousarray(np.array([dFliq0_dt,dNtot_dt])),2*nx*ny)
+    derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx*ny)#(types.int32(2),nx,ny) )#,order='C')
     return derivs
 
 @njit(float64[:](float64[:],float64,float64,float64,types.unicode_type))
