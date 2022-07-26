@@ -4,8 +4,12 @@ Created on Tue Jul 14 15:01:47 2015
 
 @author: nesh, jonathan, Max
 """
+
 import numpy as np
 from numba import njit, float64, types
+from pandas import factorize
+
+prll_bool = True
 
 @njit("f8[:](f8[:],f8[:],f8,f8)") #important
 def fqll_next_array(fqll_last,Ntot,Nstar,Nbar):
@@ -116,7 +120,7 @@ def f0d(y, t, float_params, niter):
     derivs = np.array([dFliq0_dt, dNtot_dt])
     return derivs
 
-@njit("f8[:](f8[:],f8)")
+@njit("f8[:](f8[:],f8)")#,parallel=prll_bool)
 def diffuse_1d(Fliq0,DoverdeltaX2):
     l = len(Fliq0)
     dy = np.zeros((l,))#np.shape(Fliq0))
@@ -127,7 +131,7 @@ def diffuse_1d(Fliq0,DoverdeltaX2):
         dy[l-1] = DoverdeltaX2*(Fliq0[0]-2*Fliq0[l-1]+Fliq0[l-2])
     return dy
 
-@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])")#, parallel = True)
+@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])")#, parallel=prll_bool) #slower with paralellization right now
 def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
     """ odeint function for the one-dimensional ice model """
      # unpack parameters
@@ -145,23 +149,18 @@ def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
     dNtot_dt = depsurf
 
     # Diffusion
-    l = len(Fliq0)
-    dy = np.zeros((l,))#np.shape(Fliq0))
-    for i in range(0,l-1):#(1,l-1):
-        dy[i] = DoverdeltaX2*(Fliq0[i+1]-2*Fliq0[i]+Fliq0[i-1])
-        # Boundary Conditions (periodic at ends)
-        dy[0] = DoverdeltaX2*(Fliq0[1]-2*Fliq0[0]+Fliq0[l-1]) 
-        dy[l-1] = DoverdeltaX2*(Fliq0[0]-2*Fliq0[l-1]+Fliq0[l-2])
+    dy = diffuse_1d(Fliq0,DoverdeltaX2)
      
     # Combined
     dFliq0_dt += dy
     dNtot_dt += dy
 
     # Package for output
-    derivs = np.reshape(np.array([[*dFliq0_dt], [*dNtot_dt]]),2*nx) #need to unpack lists back into arrays of proper shape (2,nx) before reshaping
+    #derivs = np.reshape(np.array([[*dFliq0_dt], [*dNtot_dt]]),2*nx) #need to unpack lists back into arrays of proper shape (2,nx) before reshaping
+    derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx)
     return derivs
 
-@njit("f8[:,:](f8[:,:],f8)")
+@njit("f8[:,:](f8[:,:],f8)", )#, parallel=prll_bool)
 def diffuse_2d(Fliq0,D):
     """ Applies numerical solution to find diffusive effects at each time step.
     
@@ -171,7 +170,8 @@ def diffuse_2d(Fliq0,D):
         The thickness of the liquid over a 2D area
 
     D : float64
-        Diffusion coefficient
+        Diffusion coefficient -- divided by deltaX^2??? #TODO needs to be divided by 
+            x^2 or y^2 inside this function in order to have non-square discretization
 
     Returns
     -------
@@ -179,17 +179,40 @@ def diffuse_2d(Fliq0,D):
         The change to the thickness of the liquid at each point in the 2d area over
          the time step
     """
-    s = np.shape(Fliq0)
-    dy = np.zeros(s) 
-    for i in range(0,s[1]): #go across the liquid, from top to bottom
+    m,n = np.shape(Fliq0)
+    dy = np.zeros((m,n)) 
+    """
+    #attempt 1
+    for i in range(0,n): #go across the liquid, from top to bottom
         dy[i,:] = diffuse_1d(Fliq0[i,:],D)#calculate left to right at each row 
-        for j in range(0,s[0]): # for each row, calculate the effects on rows below it
+        for j in range(0,m): # for each row, calculate the effects on rows below & above  it
             dy[:,j] = diffuse_1d(Fliq0[:,j],D)
     #NOTE: 1d func manages periodic boundary conditions
+    """
+    #attempt 2
+    for i in range(0,m): #go from left column to right
+        for j in range(0,n): #go from top row to bottom
+
+            ux = (Fliq0[i+1,j] - 2*Fliq0[i,j] + Fliq0[i-1,j])
+            uy = (Fliq0[i,j+1] - 2*Fliq0[i,j] + Fliq0[i,j-1])
+
+            dy[i,j] = D*(ux+uy)
+
+            # Boundary Conditions (periodic at ends) #TODO: implement this
+            #take care of left column condition wrapping to right edge
+            # if i == 0:
+            #     dy[i,j] = D*
+            # elif i == m-1: #take care of right column condition wrapping to left edge
+            #     dy[i,j] = D*
+            # if j == 0: # 
+            #     dy[i,j] = D*
+            # elif j == n-1:
+            #     dy[i,j] = D*
+            
     return dy
 
-@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])")
-def f2d(y, t, float_params, int_params, sigmastep):#NOTE: sigmastep needs to become 2D -- rotate parabola around vertical axis
+@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])")#, parallel=prll_bool)
+def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs to become 2D -- rotate parabola around vertical axis
     """ 2D version of f1d """
     # unpack parameters
     Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
@@ -214,15 +237,11 @@ def f2d(y, t, float_params, int_params, sigmastep):#NOTE: sigmastep needs to bec
     dNtot_dt += dy
 
     # Package for output
-    #derivs = np.reshape([dFliq0_dt, dNtot_dt],(2,nx,nx) ) #np.reshape(np.array([[*dFliq0_dt], [*dNtot_dt]]),2*nx) #need
-    ## NOTE: this is not it   -- ##### #derivs = np.reshape(np.ascontiguousarray((np.concatenate((dFliq0_dt,dNtot_dt),axis=0))),(types.int32(2),types.int32(nx))) #NOTE: two arrays(of size nx) containing arrays (also size nx)
-
-   # derivs = np.reshape(np.ascontiguousarray(np.array([dFliq0_dt,dNtot_dt])),2*nx*ny)
     derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx*ny)#(types.int32(2),nx,ny) )#,order='C')
     return derivs
 
 @njit(float64[:](float64[:],float64,float64,float64,types.unicode_type))
-def getsigmastep(x,xmax,center_reduction,sigmastepmax,method='parabolic'):
+def getsigmastep(x,xmax,center_reduction,sigmastepmax,method='parabolic'): #TODO: expand/implement 2d version of this
     sigmapfac = 1-center_reduction/100 #float64
     xmid = max(x)/2 #float64
     try:
