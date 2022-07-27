@@ -193,22 +193,25 @@ def diffuse_2d(Fliq0,D):
     #attempt 2
     for i in range(0,m): #go from left column to right
         for j in range(0,n): #go from top row to bottom
-
-            ux = (Fliq0[i+1,j] - 2*Fliq0[i,j] + Fliq0[i-1,j])
-            uy = (Fliq0[i,j+1] - 2*Fliq0[i,j] + Fliq0[i,j-1])
-
-            dy[i,j] = D*(ux+uy)
-
             # Boundary Conditions (periodic at ends) #TODO: implement this
             #take care of left column condition wrapping to right edge
-            # if i == 0:
-            #     dy[i,j] = D*
-            # elif i == m-1: #take care of right column condition wrapping to left edge
-            #     dy[i,j] = D*
-            # if j == 0: # 
-            #     dy[i,j] = D*
-            # elif j == n-1:
-            #     dy[i,j] = D*
+            if i == 0:
+                ux = (Fliq0[i+1,j] - 2*Fliq0[i,j] + Fliq0[m-1,j])
+                uy = (Fliq0[i,j+1] - 2*Fliq0[i,j] + Fliq0[i,j-1])
+            elif i == m-1: #take care of right column condition wrapping to left edge
+                ux = (Fliq0[i+1,j] - 2*Fliq0[i,j] + Fliq0[i-1,j])
+                uy = (Fliq0[i,j+1] - 2*Fliq0[i,j] + Fliq0[i,j-1])
+            if j == 0: # 
+                ux = (Fliq0[i+1,j] - 2*Fliq0[i,j] + Fliq0[i-1,j])
+                uy = (Fliq0[i,j+1] - 2*Fliq0[i,j] + Fliq0[i,j-1])
+            elif j == n-1:
+                ux = (Fliq0[i+1,j] - 2*Fliq0[i,j] + Fliq0[i-1,j])
+                uy = (Fliq0[i,j+1] - 2*Fliq0[i,j] + Fliq0[i,j-1])
+            else:# general case -- works
+                ux = (Fliq0[i+1,j] - 2*Fliq0[i,j] + Fliq0[i-1,j])
+                uy = (Fliq0[i,j+1] - 2*Fliq0[i,j] + Fliq0[i,j-1])
+
+            dy[i,j] = D*(ux+uy)
             
     return dy
 
