@@ -7,23 +7,22 @@ Created on Tue Jul 14 15:01:47 2015
 
 import numpy as np
 from numba import njit, float64, types
-from pandas import factorize
 
 prll_bool = True
 
-@njit("f8[:](f8[:],f8[:],f8,f8)") #important
-def fqll_next_array(fqll_last,Ntot,Nstar,Nbar):
-    #Ntot is a list of the amount of each type of ice
-    fstar = Nstar/Nbar
-    return 1 + fstar*np.sin(2*np.pi*(Ntot-Nbar*fqll_last))
-
-@njit("f8(f8,f8,f8,f8)") #important
+@njit("f8(f8,f8,f8,f8)") 
 def fqll_next(fqll_last,Ntot,Nstar,Nbar):
     #Ntot is a list of the amount of each type of ice
     fstar = Nstar/Nbar
     return 1 + fstar*np.sin(2*np.pi*(Ntot-Nbar*fqll_last))
 
-@njit("f8[:,:](f8[:,:],f8[:,:],f8,f8)") #important
+@njit("f8[:](f8[:],f8[:],f8,f8)", parallel=prll_bool)
+def fqll_next_array(fqll_last,Ntot,Nstar,Nbar):
+    #Ntot is a list of the amount of each type of ice
+    fstar = Nstar/Nbar
+    return 1 + fstar*np.sin(2*np.pi*(Ntot-Nbar*fqll_last))
+
+@njit("f8[:,:](f8[:,:],f8[:,:],f8,f8)", parallel=prll_bool)
 def fqll_next_2d_array(fqll_last,Ntot,Nstar,Nbar):
     #Ntot is a list of the amount of each type of ice
     fstar = Nstar/Nbar
@@ -39,7 +38,7 @@ def getNliq(Ntot,Nstar,Nbar,niter):
 
 @njit("f8[:](f8[:],f8,f8,i4)") #Ntot is ndarray of numbers (ints, become floats), Nstar and Nbar are floats, niter is an int literal
 def getNliq_array(Ntot,Nstar,Nbar,niter):
-    fqll_last = np.array([1.0])
+    fqll_last = np.array([1.0]*np.shape(Ntot)[0])
     for i in range(niter):
         fqll_last = fqll_next_array(fqll_last,Ntot,Nstar,Nbar)
     return fqll_last*Nbar
@@ -47,7 +46,8 @@ def getNliq_array(Ntot,Nstar,Nbar,niter):
 @njit("f8[:,:](f8[:,:],f8,f8,i4)") #Ntot is ndarray of numbers (ints, become floats), Nstar and Nbar are floats, niter is an int literal
 def getNliq_2d_array(Ntot,Nstar,Nbar,niter):
     """ Ntot is the ice- this returns the liquid layer prequilibrated to 1 bilayer equivlaent"""
-    fqll_last = np.ones(np.shape(Ntot))
+    m,n = np.shape(Ntot)
+    fqll_last = np.ones((m,n))
     for i in range(niter):
         fqll_last = fqll_next_2d_array(fqll_last,Ntot,Nstar,Nbar)
     return fqll_last*Nbar
@@ -62,12 +62,12 @@ def getdfqll_dNtot_next(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
     return fstar*np.cos(2*np.pi*(Ntot-fqll_last))*2*np.pi*(1-Nbar*dfqll_dNtot_last)
 
-@njit("f8[:](f8[:],f8[:],f8[:],f8,f8)") #quirk: fqll_last is a float but must be array for above implemenetation
+@njit("f8[:](f8[:],f8[:],f8[:],f8,f8)",parallel=prll_bool) #quirk: fqll_last is a float but must be array for above implemenetation
 def getdfqll_dNtot_next_array(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
     return fstar*np.cos(2*np.pi*(Ntot-fqll_last))*2*np.pi*(1-Nbar*dfqll_dNtot_last)
 
-@njit("f8[:,:](f8[:,:],f8[:,:],f8[:,:],f8,f8)") #quirk: fqll_last is a float but must be array for above implemenetation
+@njit("f8[:,:](f8[:,:],f8[:,:],f8[:,:],f8,f8)",parallel=prll_bool) #quirk: fqll_last is a float but must be array for above implemenetation
 def getdfqll_dNtot_next_2d_array(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
     return fstar*np.cos(2*np.pi*(Ntot-fqll_last))*2*np.pi*(1-Nbar*dfqll_dNtot_last)
@@ -81,24 +81,25 @@ def getdNliq_dNtot(Ntot,Nstar,Nbar,niter):
         fqll_last = fqll_next(fqll_last,Ntot,Nstar,Nbar)
     return dfqll_dNtot_last*Nbar 
 
-@njit("f8[:,:](f8[:,:],f8,f8,i4)")
+@njit("f8[:](f8[:],f8,f8,i4)",parallel=prll_bool)
+def getdNliq_dNtot_array(Ntot,Nstar,Nbar,niter):
+    dfqll_dNtot_last = np.array([0.0]*np.shape(Ntot)[0])
+    fqll_last = np.array([1.0]*np.shape(Ntot)[0])
+    for i in range(niter):
+        dfqll_dNtot_last = getdfqll_dNtot_next_array(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar)
+        fqll_last = fqll_next_array(fqll_last,Ntot,Nstar,Nbar)
+    return dfqll_dNtot_last*Nbar 
+
+@njit("f8[:,:](f8[:,:],f8,f8,i4)",parallel=prll_bool)
 def getdNliq_dNtot_2d_array(Ntot,Nstar,Nbar,niter):
-    s = np.shape(Ntot)
+    m,n = np.shape(Ntot)
+    s =(m,n)
     dfqll_dNtot_last = np.zeros(s) #np.array([0.0])
     fqll_last = np.ones(s) #np.array([1.0])
 
     for i in range(niter):
         dfqll_dNtot_last = getdfqll_dNtot_next_2d_array(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar)
         fqll_last = fqll_next_2d_array(fqll_last,Ntot,Nstar,Nbar)
-    return dfqll_dNtot_last*Nbar 
-
-@njit("f8[:](f8[:],f8,f8,i4)")
-def getdNliq_dNtot_array(Ntot,Nstar,Nbar,niter):
-    dfqll_dNtot_last = np.array([0.0])
-    fqll_last = np.array([1.0])
-    for i in range(niter):
-        dfqll_dNtot_last = getdfqll_dNtot_next_array(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar)
-        fqll_last = fqll_next_array(fqll_last,Ntot,Nstar,Nbar)
     return dfqll_dNtot_last*Nbar 
 
 @njit("f8[:](f8[:],f8,f8[:],i4)")
@@ -120,7 +121,7 @@ def f0d(y, t, float_params, niter):
     derivs = np.array([dFliq0_dt, dNtot_dt])
     return derivs
 
-@njit("f8[:](f8[:],f8)")#,parallel=prll_bool)
+@njit("f8[:](f8[:],f8)",parallel=prll_bool)
 def diffuse_1d(Fliq0,DoverdeltaX2):
     l = len(Fliq0)
     dy = np.zeros((l,))#np.shape(Fliq0))
@@ -131,7 +132,7 @@ def diffuse_1d(Fliq0,DoverdeltaX2):
         dy[l-1] = DoverdeltaX2*(Fliq0[0]-2*Fliq0[l-1]+Fliq0[l-2])
     return dy
 
-@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])")#, parallel=prll_bool) #slower with paralellization right now
+@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])",parallel=prll_bool)#slower with paralellization right now
 def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
     """ odeint function for the one-dimensional ice model """
      # unpack parameters
@@ -139,7 +140,7 @@ def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
     niter, nx = int_params
 
     # unpack current values of y
-    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(types.int32(2),types.int32(nx)))
+    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(types.int32(2),types.int32(nx)))#TODO c
     
     # Deposition
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
@@ -160,7 +161,7 @@ def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
     derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx)
     return derivs
 
-@njit("f8[:,:](f8[:,:],f8)", )#, parallel=prll_bool)
+@njit("f8[:,:](f8[:,:],f8)",parallel=prll_bool)
 def diffuse_2d(Fliq0,D):
     """ Applies numerical solution to find diffusive effects at each time step.
     
@@ -211,7 +212,7 @@ def diffuse_2d(Fliq0,D):
             
     return dy
 
-@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])")#, parallel=prll_bool)
+@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])",parallel=prll_bool)
 def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs to become 2D -- rotate parabola around vertical axis
     """ 2D version of f1d """
     # unpack parameters
