@@ -8,7 +8,7 @@ Created on Tue Jul 14 15:01:47 2015
 import numpy as np
 from numba import njit, float64, types
 
-prll_bool = True
+prll_bool = False
 
 @njit("f8(f8,f8,f8,f8)") 
 def fqll_next(fqll_last,Ntot,Nstar,Nbar):
@@ -83,8 +83,8 @@ def getdNliq_dNtot(Ntot,Nstar,Nbar,niter):
 
 @njit("f8[:](f8[:],f8,f8,i4)",parallel=prll_bool)
 def getdNliq_dNtot_array(Ntot,Nstar,Nbar,niter):
-    dfqll_dNtot_last = np.array([0.0]*np.shape(Ntot)[0])
-    fqll_last = np.array([1.0]*np.shape(Ntot)[0])
+    dfqll_dNtot_last = np.zeros(np.shape(Ntot)[0])
+    fqll_last = np.ones(np.shape(Ntot)[0])
     for i in range(niter):
         dfqll_dNtot_last = getdfqll_dNtot_next_array(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar)
         fqll_last = fqll_next_array(fqll_last,Ntot,Nstar,Nbar)
@@ -161,8 +161,39 @@ def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
     derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx)
     return derivs
 
+@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])",parallel=prll_bool)#slower with paralellization right now
+def f1d_diff_only(y, t, float_params, int_params, sigmastep): #sigmastep is an array
+    """ odeint function for the one-dimensional ice model-- only does diffusion of liquid layer"""
+     # unpack parameters
+    Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
+    niter, nx = int_params
+
+    # unpack current values of y
+    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(types.int32(2),types.int32(nx))) #old
+    #Fliq0 = np.reshape(y,nx)
+    
+    # Deposition
+    delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
+    sigD = (sigmastep - delta * sigma0)/(1+delta*sigma0)
+    depsurf = deprate * sigD
+    dFliq0_dt = getdNliq_dNtot_array(Ntot0,Nstar,Nbar,niter)*depsurf
+    dNtot_dt = depsurf
+
+    # Diffusion
+    dy = diffuse_1d(Fliq0,DoverdeltaX2)
+
+    # Combined
+    dFliq0_dt += dy
+    dNtot_dt += dy
+
+    # Package for output
+    print('shape of dFliq0_dt: ',dFliq0_dt.shape)
+    derivs = np.reshape(dFliq0_dt,nx)
+
+    return derivs
+
 @njit("f8[:,:](f8[:,:],f8)",parallel=prll_bool)
-def diffuse_2d(Fliq0,D):
+def diffuse_2d(Fliq0,t,D,shape):
     """ Applies numerical solution to find diffusive effects at each time step.
     
     Parameters
@@ -180,7 +211,7 @@ def diffuse_2d(Fliq0,D):
         The change to the thickness of the liquid at each point in the 2d area over
          the time step
     """
-    m,n = np.shape(Fliq0)
+    m,n = shape
     dy = np.zeros((m,n)) 
     """
     #attempt 1
@@ -193,23 +224,19 @@ def diffuse_2d(Fliq0,D):
     #attempt 2
     for i in range(0,m): #go from left column to right
         for j in range(0,n): #go from top row to bottom
-            # Boundary Conditions (periodic at ends) #TODO: implement this
-            #take care of left column condition wrapping to right edge
-            if i == 0:
-                ux = (Fliq0[i+1,j] - 2*Fliq0[i,j] + Fliq0[m-1,j])
-                uy = (Fliq0[i,j+1] - 2*Fliq0[i,j] + Fliq0[i,j-1])
-            elif i == m-1: #take care of right column condition wrapping to left edge
-                ux = (Fliq0[i+1,j] - 2*Fliq0[i,j] + Fliq0[i-1,j])
-                uy = (Fliq0[i,j+1] - 2*Fliq0[i,j] + Fliq0[i,j-1])
-            if j == 0: # 
-                ux = (Fliq0[i+1,j] - 2*Fliq0[i,j] + Fliq0[i-1,j])
-                uy = (Fliq0[i,j+1] - 2*Fliq0[i,j] + Fliq0[i,j-1])
-            elif j == n-1:
-                ux = (Fliq0[i+1,j] - 2*Fliq0[i,j] + Fliq0[i-1,j])
-                uy = (Fliq0[i,j+1] - 2*Fliq0[i,j] + Fliq0[i,j-1])
-            else:# general case -- works
-                ux = (Fliq0[i+1,j] - 2*Fliq0[i,j] + Fliq0[i-1,j])
-                uy = (Fliq0[i,j+1] - 2*Fliq0[i,j] + Fliq0[i,j-1])
+
+            ip1=i+1
+            jp1=j+1
+            # Boundary Conditions (periodic at ends) #TODO: test this
+           
+            if i == m-1: #take care of right column condition wrapping to left edge
+                ip1 = 0
+
+            if j == n-1: #take care of bottom edge wrapping to top edge
+                jp1 = 0
+
+            ux = (Fliq0[ip1,j] - 2*Fliq0[i,j] + Fliq0[i-1,j])
+            uy = (Fliq0[i,jp1] - 2*Fliq0[i,j] + Fliq0[i,j-1])
 
             dy[i,j] = D*(ux+uy)
             
@@ -245,7 +272,7 @@ def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs 
     return derivs
 
 @njit(float64[:](float64[:],float64,float64,float64,types.unicode_type))
-def getsigmastep(x,xmax,center_reduction,sigmastepmax,method='parabolic'): #TODO: expand/implement 2d version of this
+def getsigmastep(x,xmax,center_reduction,sigmastepmax,method='parabolic'): 
     sigmapfac = 1-center_reduction/100 #float64
     xmid = max(x)/2 #float64
     try:
@@ -256,4 +283,13 @@ def getsigmastep(x,xmax,center_reduction,sigmastepmax,method='parabolic'): #TODO
     except:
         print('bad method')
 
+    return fsig*sigmastepmax
+
+@njit(float64[:](float64[:],float64,float64,float64,types.unicode_type))
+def getsigmastep_2d(x,xmax,center_reduction,sigmastepmax,method='parabolic'): #TODO: implement 
+    sigmapfac = 1-center_reduction/100 #float64
+    xmid = max(x)/2 #float64
+    
+    fsig = (x-xmid)**2/xmid**2*(1-sigmapfac)+sigmapfac
+    
     return fsig*sigmastepmax
