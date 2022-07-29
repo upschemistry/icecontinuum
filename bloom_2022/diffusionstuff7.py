@@ -193,8 +193,8 @@ def f1d_diff_only(y, t, float_params, int_params, sigmastep): #sigmastep is an a
     return derivs
 
 #@njit("f8[:](f8[:],f8,f8,i4[:])",parallel=prll_bool)
-@njit(float64[:](float64[:],float64,float64,types.UniTuple(types.int64,2)),parallel=prll_bool)
-def diffuse_2d(Fliq0,t,D,shape):
+@njit(float64[:](float64,float64[:],float64,types.UniTuple(types.int64,2)),parallel=prll_bool)
+def diffuse_2d(t,y,D,shape):
     """ Applies numerical solution to find diffusive effects at each time step. Fliq0 is flattened 2d array of shape shape.
     
     Parameters
@@ -218,6 +218,7 @@ def diffuse_2d(Fliq0,t,D,shape):
         The change to the thickness of the liquid at each point in the 2d area over
          the time step
     """
+    Fliq0 = y
     Fliq0 = np.reshape(np.ascontiguousarray(Fliq0),shape)
     m,n = shape
     dy = np.zeros((m,n)) 
@@ -257,7 +258,6 @@ def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs 
     Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
     niter, nx, ny = int_params
 
-
     # unpack current values of y
     Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(types.int32(2),types.int32(nx),types.int32(ny)))
     
@@ -269,7 +269,7 @@ def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs 
     dNtot_dt = depsurf
 
     # Diffusion
-    dy = diffuse_2d(np.reshape(np.ascontiguousarray(Fliq0),nx*ny),t,DoverdeltaX2,(types.int32(nx),types.int32(ny)))
+    dy = diffuse_2d(t,np.reshape(np.ascontiguousarray(Fliq0),nx*ny),DoverdeltaX2,(types.int32(nx),types.int32(ny)))
      
     # Combined
     dFliq0_dt += dy
