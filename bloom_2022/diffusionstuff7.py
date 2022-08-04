@@ -28,7 +28,6 @@ def fqll_next_2d_array(fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
     return 1 + fstar*np.sin(2*np.pi*(Ntot-Nbar*fqll_last))
 
-
 @njit("f8(f8,f8,f8,i4)") #Ntot is float in this case, Nstar and Nbar are floats, niter is an int literal
 def getNliq(Ntot,Nstar,Nbar,niter):
     fqll_last = 1.0
@@ -38,7 +37,7 @@ def getNliq(Ntot,Nstar,Nbar,niter):
 
 @njit("f8[:](f8[:],f8,f8,i4)") #Ntot is ndarray of numbers (ints, become floats), Nstar and Nbar are floats, niter is an int literal
 def getNliq_array(Ntot,Nstar,Nbar,niter):
-    fqll_last = np.array([1.0]*np.shape(Ntot)[0])
+    fqll_last = np.ones(np.shape(Ntot))#np.array([1.0]*np.shape(Ntot)[0])
     for i in range(niter):
         fqll_last = fqll_next_array(fqll_last,Ntot,Nstar,Nbar)
     return fqll_last*Nbar
@@ -94,8 +93,8 @@ def getdNliq_dNtot_array(Ntot,Nstar,Nbar,niter):
 def getdNliq_dNtot_2d_array(Ntot,Nstar,Nbar,niter):
     m,n = np.shape(Ntot)
     s =(m,n)
-    dfqll_dNtot_last = np.zeros(s) #np.array([0.0])
-    fqll_last = np.ones(s) #np.array([1.0])
+    dfqll_dNtot_last = np.zeros(s)
+    fqll_last = np.ones(s) 
 
     for i in range(niter):
         dfqll_dNtot_last = getdfqll_dNtot_next_2d_array(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar)
@@ -252,7 +251,7 @@ def diffuse_2d(t,y,D,shape):
     return np.reshape(dy,(m*n))
 
 @njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])",parallel=prll_bool)
-def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs to become 2D -- rotate parabola around vertical axis
+def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs to become 2D -- rotate parabola around vertical axis? or use vaporfield 3d data
     """ 2D version of f1d """
     # unpack parameters
     Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
@@ -293,11 +292,23 @@ def getsigmastep(x,xmax,center_reduction,sigmastepmax,method='parabolic'):
 
     return fsig*sigmastepmax
 
-@njit(float64[:](float64[:],float64,float64,float64,types.unicode_type))
-def getsigmastep_2d(x,xmax,center_reduction,sigmastepmax,method='parabolic'): #TODO: implement 
+@njit(types.containers.UniTuple(float64[:,:],2)(float64[:],float64[:]))
+def meshgrid(x, y):
+    xx = np.empty(shape=(x.size, y.size), dtype=x.dtype)
+    yy = np.empty(shape=(x.size, y.size), dtype=y.dtype)
+    for i in range(y.size):
+        for j in range(x.size):
+            xx[i,j] = x[j] 
+            yy[i,j] = y[i] 
+    return xx, yy
+
+@njit(float64[:,:](float64[:],float64[:],float64,float64))
+def getsigmastep_2d(xs,ys,center_reduction,sigmastepmax): #TODO: implement 
     sigmapfac = 1-center_reduction/100 #float64
-    xmid = max(x)/2 #float64
+    xmid = max(xs)/2 #float64
+    ymid = max(ys)/2 #float64
+    xs,ys = meshgrid(xs,ys)
     
-    fsig = (x-xmid)**2/xmid**2*(1-sigmapfac)+sigmapfac
-    
+    fsig = ((xs-xmid)**2 + (ys-ymid)**2)/xmid**2*(1-sigmapfac)+sigmapfac #NOTE xmid in denominator does not support distinct 2d discretization (diff dx and dy)
+
     return fsig*sigmastepmax
