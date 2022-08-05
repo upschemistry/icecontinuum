@@ -5,6 +5,7 @@ Created on Tue Jul 14 15:01:47 2015
 @author: nesh, jonathan, Max
 """
 
+from tkinter import OFF
 import numpy as np
 from numba import njit, float64, types
 
@@ -92,7 +93,7 @@ def getdNliq_dNtot_array(Ntot,Nstar,Nbar,niter):
 @njit("f8[:,:](f8[:,:],f8,f8,i4)", parallel=prll_bool)
 def getdNliq_dNtot_2d_array(Ntot,Nstar,Nbar,niter):
     m,n = np.shape(Ntot)
-    s =(m,n)
+    s = (m,n)
     dfqll_dNtot_last = np.zeros(s)
     fqll_last = np.ones(s) 
 
@@ -159,38 +160,6 @@ def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
     derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx)
     return derivs
 
-@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])",parallel=prll_bool)#slower with paralellization right now
-def f1d_diff_only(y, t, float_params, int_params, sigmastep): #sigmastep is an array
-    """ odeint function for the one-dimensional ice model-- only does diffusion of liquid layer"""
-     # unpack parameters
-    Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
-    niter, nx = int_params
-
-    # unpack current values of y
-    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(types.int32(2),types.int32(nx))) #old
-    #Fliq0 = np.reshape(y,nx)
-    
-    # Deposition
-    delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
-    sigD = (sigmastep - delta * sigma0)/(1+delta*sigma0)
-    depsurf = deprate * sigD
-    dFliq0_dt = getdNliq_dNtot_array(Ntot0,Nstar,Nbar,niter)*depsurf
-    dNtot_dt = depsurf
-
-    # Diffusion
-    dy = diffuse_1d(Fliq0,DoverdeltaX2)
-
-    # Combined
-    dFliq0_dt += dy
-    dNtot_dt += dy
-
-    # Package for output
-    print('shape of dFliq0_dt: ',dFliq0_dt.shape)
-    derivs = np.reshape(dFliq0_dt,nx)
-
-    return derivs
-
-
 @njit(float64[:](float64,float64[:],float64,types.int64[:]), parallel=prll_bool)
 def diffuse_2d(t,y,D,shape):
     """ Applies numerical solution to find diffusive effects at each time step. Fliq0 is flattened 2d array of shape shape.
@@ -241,10 +210,12 @@ def diffuse_2d(t,y,D,shape):
             
     return np.reshape(dy,(m*n))
 
-
-@njit("f8[:](f8[:],f8,f8[:],i8[:],f8[:])",parallel=prll_bool)
+@njit("f8[:](f8[:],f8,f8[:],i8[:],f8[:,:])",parallel=prll_bool)
 def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs to become 2D -- use vaporfield 3d data
     """ 2D version of f1d """
+
+    # diffusion = True
+
     # unpack parameters
     Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
     niter, nx, ny = int_params
@@ -259,6 +230,7 @@ def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs 
     dFliq0_dt = getdNliq_dNtot_2d_array(Ntot0,Nstar,Nbar,niter)*depsurf
     dNtot_dt = depsurf
 
+    # if diffusion:
     # Diffusion
     dy = np.reshape(np.ascontiguousarray( diffuse_2d(t, np.reshape(np.ascontiguousarray(Fliq0),nx*ny), DoverdeltaX2, np.array((nx,ny))) ),  (nx,ny))
     # Combined
@@ -294,6 +266,32 @@ def meshgrid(x, y):
     return xx, yy
 
 @njit(float64[:,:](float64[:],float64[:],float64,float64))
+def getsigmastep_2d(xs,ys,center_reduction,sigmastepmax): 
+    
+    # Getting the middle values of "x" and "y"
+    xmax = np.max(xs)
+    xmin = np.min(xs)
+    xmid = (xmax-xmin)/2 +xmin 
+    
+    ymax = np.max(ys)
+    ymin = np.min(ys)
+    ymid = (ymax-ymin)/2 +ymin
+    
+    # Decide on an asymmetry factor
+    asym = (xmax-xmin)/(ymax-ymin)
+    
+    # Calculate 2d parabolic coefficients
+    C0 = sigmastepmax - center_reduction
+    Cx = center_reduction/(xmax-xmid)**2
+    Cy = center_reduction/(ymax-ymid)**2/asym
+    
+    # Make a grid and evaluate supersaturation on it
+    xgrid,ygrid = meshgrid(xs-xmid,ys-ymid)
+    return C0 + xgrid**2*Cx + ygrid**2*Cy
+
+"""  
+#old attempt of 2d supersaturation
+@njit(float64[:,:](float64[:],float64[:],float64,float64))
 def getsigmastep_2d(xs,ys,center_reduction,sigmastepmax): #TODO: implement 
     sigmapfac = 1-center_reduction/100 #float64
     xmid = max(xs)/2 #float64
@@ -303,4 +301,4 @@ def getsigmastep_2d(xs,ys,center_reduction,sigmastepmax): #TODO: implement
     
     fsig = (xcoeff*(xs-xmid)**2 + ycoeff*(ys-ymid)**2)/xmid**2*(1-sigmapfac)+sigmapfac #NOTE xmid in denominator does not support distinct 2d discretization (diff dx and dy)
 
-    return fsig*sigmastepmax
+    return fsig*sigmastepmax """
