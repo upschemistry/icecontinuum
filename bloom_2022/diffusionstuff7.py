@@ -8,7 +8,7 @@ Created on Tue Jul 14 15:01:47 2015
 import numpy as np
 from numba import njit, float64, types
 
-prll_bool = False
+prll_bool = True
 
 @njit("f8(f8,f8,f8,f8)") 
 def fqll_next(fqll_last,Ntot,Nstar,Nbar):
@@ -89,7 +89,7 @@ def getdNliq_dNtot_array(Ntot,Nstar,Nbar,niter):
         fqll_last = fqll_next_array(fqll_last,Ntot,Nstar,Nbar)
     return dfqll_dNtot_last*Nbar 
 
-@njit("f8[:,:](f8[:,:],f8,f8,i4)",parallel=prll_bool)
+@njit("f8[:,:](f8[:,:],f8,f8,i4)", parallel=prll_bool)
 def getdNliq_dNtot_2d_array(Ntot,Nstar,Nbar,niter):
     m,n = np.shape(Ntot)
     s =(m,n)
@@ -107,7 +107,6 @@ def f0d(y, t, float_params, niter):
     Nbar, Nstar, sigmastepmax, sigma0, deprate = float_params  # unpack parameters
     
     Fliq0, Ntot0 = y   # unpack current values of y
-    #Fliq0, Ntot0 = np.reshape(y,2)    
 
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
     sigD = (sigmastepmax - delta * sigma0)/(1+delta*sigma0)
@@ -153,7 +152,7 @@ def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
      
     # Combined
     dFliq0_dt += dy
-    dNtot_dt += dy
+    dNtot_dt += dy 
 
     # Package for output
     #derivs = np.reshape(np.array([[*dFliq0_dt], [*dNtot_dt]]),2*nx) #need to unpack lists back into arrays of proper shape (2,nx) before reshaping
@@ -191,8 +190,8 @@ def f1d_diff_only(y, t, float_params, int_params, sigmastep): #sigmastep is an a
 
     return derivs
 
-#@njit("f8[:](f8[:],f8,f8,i4[:])",parallel=prll_bool)
-@njit(float64[:](float64,float64[:],float64,types.UniTuple(types.int64,2)),parallel=prll_bool)
+
+@njit(float64[:,:](float64,float64[:,:],float64,types.int32[:]), parallel=prll_bool)
 def diffuse_2d(t,y,D,shape):
     """ Applies numerical solution to find diffusive effects at each time step. Fliq0 is flattened 2d array of shape shape.
     
@@ -206,7 +205,7 @@ def diffuse_2d(t,y,D,shape):
 
     D : float64
         Diffusion coefficient -- divided by deltaX^2??? #TODO needs to be divided by 
-            x^2 or y^2 inside this function in order to have non-square discretization
+                                            #TODO: cont.      x^2 or y^2 inside this function in order to have non-square discretization
 
     shape : tuple
         The shape of the 2D array Fliq0
@@ -218,8 +217,8 @@ def diffuse_2d(t,y,D,shape):
          the time step
     """
     Fliq0 = y
-    Fliq0 = np.reshape(np.ascontiguousarray(Fliq0),shape)
     m,n = shape
+    #Fliq0 = np.reshape(np.ascontiguousarray(Fliq0),(m,n)) #NOTE: reshpaing code not needed-- removed for speed
     dy = np.zeros((m,n)) 
     """
     #attempt 1
@@ -248,10 +247,10 @@ def diffuse_2d(t,y,D,shape):
 
             dy[i,j] = D*(ux+uy)
             
-    return np.reshape(dy,(m*n))
+    return dy #np.reshape(dy,(m*n)) 
 
 @njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])",parallel=prll_bool)
-def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs to become 2D -- rotate parabola around vertical axis? or use vaporfield 3d data
+def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs to become 2D -- use vaporfield 3d data
     """ 2D version of f1d """
     # unpack parameters
     Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
@@ -268,8 +267,8 @@ def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs 
     dNtot_dt = depsurf
 
     # Diffusion
-    dy = diffuse_2d(t,np.reshape(np.ascontiguousarray(Fliq0),nx*ny),DoverdeltaX2,(types.int32(nx),types.int32(ny)))
-     
+    dy = diffuse_2d(t,Fliq0,DoverdeltaX2,np.array((nx,ny)))
+    #np.reshape(np.ascontiguousarray(Fliq0),nx*ny)
     # Combined
     dFliq0_dt += dy
     dNtot_dt += dy
@@ -308,7 +307,8 @@ def getsigmastep_2d(xs,ys,center_reduction,sigmastepmax): #TODO: implement
     xmid = max(xs)/2 #float64
     ymid = max(ys)/2 #float64
     xs,ys = meshgrid(xs,ys)
+    xcoeff,ycoeff = 1,2 #TODO: implement to accomodate non-symmetric x and y
     
-    fsig = ((xs-xmid)**2 + (ys-ymid)**2)/xmid**2*(1-sigmapfac)+sigmapfac #NOTE xmid in denominator does not support distinct 2d discretization (diff dx and dy)
+    fsig = (xcoeff*(xs-xmid)**2 + ycoeff*(ys-ymid)**2)/xmid**2*(1-sigmapfac)+sigmapfac #NOTE xmid in denominator does not support distinct 2d discretization (diff dx and dy)
 
     return fsig*sigmastepmax
