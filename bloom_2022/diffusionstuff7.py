@@ -191,7 +191,7 @@ def f1d_diff_only(y, t, float_params, int_params, sigmastep): #sigmastep is an a
     return derivs
 
 
-@njit(float64[:,:](float64,float64[:,:],float64,types.int32[:]), parallel=prll_bool)
+@njit(float64[:](float64,float64[:],float64,types.int64[:]), parallel=prll_bool)
 def diffuse_2d(t,y,D,shape):
     """ Applies numerical solution to find diffusive effects at each time step. Fliq0 is flattened 2d array of shape shape.
     
@@ -218,17 +218,9 @@ def diffuse_2d(t,y,D,shape):
     """
     Fliq0 = y
     m,n = shape
-    #Fliq0 = np.reshape(np.ascontiguousarray(Fliq0),(m,n)) #NOTE: reshpaing code not needed-- removed for speed
+    Fliq0 = np.reshape(np.ascontiguousarray(Fliq0),(m,n)) #reshaping required for odeint/solve_ivp
     dy = np.zeros((m,n)) 
-    """
-    #attempt 1
-    for i in range(0,n): #go across the liquid, from top to bottom
-        dy[i,:] = diffuse_1d(Fliq0[i,:],D)#calculate left to right at each row 
-        for j in range(0,m): # for each row, calculate the effects on rows below & above  it
-            dy[:,j] = diffuse_1d(Fliq0[:,j],D)
-    #NOTE: 1d func manages periodic boundary conditions
-    """
-    #attempt 2
+   
     for i in range(0,m): #go from left column to right
         for j in range(0,n): #go from top row to bottom
 
@@ -247,9 +239,10 @@ def diffuse_2d(t,y,D,shape):
 
             dy[i,j] = D*(ux+uy)
             
-    return dy #np.reshape(dy,(m*n)) 
+    return np.reshape(dy,(m*n))
 
-@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])",parallel=prll_bool)
+
+@njit("f8[:](f8[:],f8,f8[:],i8[:],f8[:])",parallel=prll_bool)
 def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs to become 2D -- use vaporfield 3d data
     """ 2D version of f1d """
     # unpack parameters
@@ -267,14 +260,13 @@ def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs 
     dNtot_dt = depsurf
 
     # Diffusion
-    dy = diffuse_2d(t,Fliq0,DoverdeltaX2,np.array((nx,ny)))
-    #np.reshape(np.ascontiguousarray(Fliq0),nx*ny)
+    dy = np.reshape(np.ascontiguousarray( diffuse_2d(t, np.reshape(np.ascontiguousarray(Fliq0),nx*ny), DoverdeltaX2, np.array((nx,ny))) ),  (nx,ny))
     # Combined
     dFliq0_dt += dy
     dNtot_dt += dy
 
     # Package for output
-    derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx*ny)#(types.int32(2),nx,ny) )#,order='C')
+    derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx*ny)
     return derivs
 
 @njit(float64[:](float64[:],float64,float64,float64,types.unicode_type))
