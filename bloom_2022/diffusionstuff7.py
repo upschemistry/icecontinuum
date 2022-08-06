@@ -5,7 +5,6 @@ Created on Tue Jul 14 15:01:47 2015
 @author: nesh, jonathan, Max
 """
 
-from tkinter import OFF
 import numpy as np
 from numba import njit, float64, types
 
