@@ -209,6 +209,58 @@ def diffuse_2d(t,y,D,shape):
             
     return np.reshape(dy,(m*n))
 
+@njit(float64[:,:](float64,float64[:,:],float64), parallel=prll_bool)
+def diffuse_2d_ivp(t,y,D):
+    """ Applies numerical solution to find diffusive effects at each time step. Fliq0 is flattened 2d array of shape shape.
+    
+    Parameters
+    ----------
+    Fliq0 : 2D Numpy Array 
+        The thickness of the liquid over a 2D area
+
+    t : float
+        The time step-- unused- placeholder for odeint
+
+    D : float64
+        Diffusion coefficient -- divided by deltaX^2??? #TODO needs to be divided by 
+                                            #TODO: cont.      x^2 or y^2 inside this function in order to have non-square discretization
+
+    shape : tuple
+        The shape of the 2D array Fliq0
+
+    Returns
+    -------
+    dy : Flattened 2D Numpy Array
+        The change to the thickness of the liquid at each point in the 2d area over
+         the time step
+    """
+    Fliq0 = y
+    #m,n = shape
+    #Fliq0 = np.reshape(np.ascontiguousarray(Fliq0),(m,n)) #reshaping required for odeint/solve_ivp
+    m,n = np.shape(Fliq0)
+    dy = np.zeros((m,n)) 
+    for i in range(0,m): #go from left column to right
+        for j in range(0,n): #go from top row to bottom
+
+            ip1=i+1
+            jp1=j+1
+            # Boundary Conditions (periodic at ends) #TODO: test this
+           
+            if i == m-1: #take care of right column condition wrapping to left edge
+                ip1 = 0
+
+            if j == n-1: #take care of bottom edge wrapping to top edge
+                jp1 = 0
+
+            ux = (Fliq0[ip1,j] - 2*Fliq0[i,j] + Fliq0[i-1,j])
+            uy = (Fliq0[i,jp1] - 2*Fliq0[i,j] + Fliq0[i,j-1])
+
+            dy[i,j] = D*(ux+uy)
+            
+    #return np.reshape(dy,(m*n))
+    return dy
+
+
 @njit("f8[:](f8[:],f8,f8[:],i8[:],f8[:,:])",parallel=prll_bool)
 def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs to become 2D -- use vaporfield 3d data
     """ 2D version of f1d """
@@ -231,7 +283,7 @@ def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs 
 
     # if diffusion:
     # Diffusion
-    dy = np.reshape(np.ascontiguousarray( diffuse_2d(t, np.reshape(np.ascontiguousarray(Fliq0),nx*ny), DoverdeltaX2, np.array((nx,ny))) ),  (nx,ny))
+    dy =  np.reshape(np.ascontiguousarray( diffuse_2d(t, np.reshape(np.ascontiguousarray(Fliq0),nx*ny), DoverdeltaX2, np.array((nx,ny))) ),  (nx,ny))
     # Combined
     dFliq0_dt += dy
     dNtot_dt += dy
@@ -240,7 +292,7 @@ def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs 
     derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx*ny)
     return derivs
 
-@njit("f8[:](f8,f8[:],f8[:],i8[:],f8[:,:])",parallel=prll_bool)
+@njit("f8[:,:,:](f8,f8[:,:,:],f8[:],i8[:],f8[:,:])",parallel=prll_bool)
 def f2d_ivp(t, y, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs to become 2D -- use vaporfield 3d data
     """ 2D version of f1d """
 
@@ -251,7 +303,8 @@ def f2d_ivp(t, y, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep ne
     niter, nx, ny = int_params
 
     # unpack current values of y
-    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(types.int32(2),types.int32(nx),types.int32(ny)))
+    #Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(types.int32(2),types.int32(nx),types.int32(ny)))
+    Fliq0, Ntot0 = y
     
     # Deposition
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
@@ -262,13 +315,14 @@ def f2d_ivp(t, y, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep ne
 
     # if diffusion:
     # Diffusion
-    dy = np.reshape(np.ascontiguousarray( diffuse_2d(t, np.reshape(np.ascontiguousarray(Fliq0),nx*ny), DoverdeltaX2, np.array((nx,ny))) ),  (nx,ny))
+    dy = diffuse_2d_ivp(t, Fliq0, DoverdeltaX2)
     # Combined
     dFliq0_dt += dy
     dNtot_dt += dy
 
     # Package for output
-    derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx*ny)
+    #derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx*ny)
+    derivs = np.stack((dFliq0_dt,dNtot_dt),axis=0) #shape (2,nx,ny)
     return derivs
 
 @njit(float64[:](float64[:],float64,float64,float64,types.unicode_type))
