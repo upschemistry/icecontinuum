@@ -240,6 +240,37 @@ def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs 
     derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx*ny)
     return derivs
 
+@njit("f8[:](f8,f8[:],f8[:],i8[:],f8[:,:])",parallel=prll_bool)
+def f2d_ivp(t, y, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs to become 2D -- use vaporfield 3d data
+    """ 2D version of f1d """
+
+    # diffusion = True
+
+    # unpack parameters
+    Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
+    niter, nx, ny = int_params
+
+    # unpack current values of y
+    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(types.int32(2),types.int32(nx),types.int32(ny)))
+    
+    # Deposition
+    delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
+    sigD = (sigmastep - delta * sigma0)/(1+delta*sigma0)
+    depsurf = deprate * sigD
+    dFliq0_dt = getdNliq_dNtot_2d_array(Ntot0,Nstar,Nbar,niter)*depsurf
+    dNtot_dt = depsurf
+
+    # if diffusion:
+    # Diffusion
+    dy = np.reshape(np.ascontiguousarray( diffuse_2d(t, np.reshape(np.ascontiguousarray(Fliq0),nx*ny), DoverdeltaX2, np.array((nx,ny))) ),  (nx,ny))
+    # Combined
+    dFliq0_dt += dy
+    dNtot_dt += dy
+
+    # Package for output
+    derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx*ny)
+    return derivs
+
 @njit(float64[:](float64[:],float64,float64,float64,types.unicode_type))
 def getsigmastep(x,xmax,center_reduction,sigmastepmax,method='parabolic'): 
     sigmapfac = 1-center_reduction/100 #float64
@@ -256,6 +287,7 @@ def getsigmastep(x,xmax,center_reduction,sigmastepmax,method='parabolic'):
 
 @njit(types.containers.UniTuple(float64[:,:],2)(float64[:],float64[:]))
 def meshgrid(x, y):
+    """ numba-compatible version of np.meshgrid """
     xx = np.empty(shape=(x.size, y.size), dtype=x.dtype)
     yy = np.empty(shape=(x.size, y.size), dtype=y.dtype)
     for i in range(y.size):
