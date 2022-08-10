@@ -130,7 +130,7 @@ def diffuse_1d(Fliq0,DoverdeltaX2):
         dy[l-1] = DoverdeltaX2*(Fliq0[0]-2*Fliq0[l-1]+Fliq0[l-2])
     return dy
 
-@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])",parallel=prll_bool)#slower with paralellization right now
+@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])")#,parallel=prll_bool)#slower with paralellization right now
 def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
     """ odeint function for the one-dimensional ice model """
      # unpack parameters

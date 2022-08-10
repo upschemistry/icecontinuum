@@ -129,10 +129,10 @@ class Simulation():
         deprate = nu_kin/umpersec_over_mlyperus # monolayers per microsecond
         deprate_times_deltaT = deprate * self.deltaT
         # Supersaturation
-        sigma0 = 0.19
-        sigmastepmax = 0.20 #-0.10 # Must be bigger than sigma0 to get growth, less than 0 for ablation
-        center_reduction = 1.0 #0.25 # In percent
-        c_r = center_reduction/100
+        self.sigma0 = 0.19
+        self.sigmastepmax = 0.20 #-0.10 # Must be bigger than sigma0 to get growth, less than 0 for ablation
+        self.center_reduction = 0.5 #1.0 #0.25 # In percent
+        c_r = self.center_reduction/100
         # Diffusion coefficient scaled for this time-step and space-step
         DoverdeltaX2 = D/deltaX**2
         DoverdeltaY2 = D/deltaY**2 #unused
@@ -147,8 +147,8 @@ class Simulation():
             "nu_kin":nu_kin,
             "deprate":deprate,
             "deprate_times_deltaT":deprate_times_deltaT,
-            "sigma0":sigma0,
-            "sigmastepmax":sigmastepmax,
+            "sigma0":self.sigma0,
+            "sigmastepmax":self.sigmastepmax,
             "c_r":c_r,
             "DoverdeltaX2":DoverdeltaX2,
             "DoverdeltaY2":DoverdeltaY2,
@@ -172,7 +172,7 @@ class Simulation():
         #self.tinterval = [t0, tmax] #this is for solve_ivp
         self.tinterval = [t0, self.deltaT] #this is for odeint
 
-        self.float_params = {'Nbar':Nbar,'Nstar':Nstar, 'sigma0':sigma0, 'deprate':deprate, 'DoverdeltaX2':DoverdeltaX2, 'center_reduction':center_reduction, 'sigmastepmax':sigmastepmax}
+        self.float_params = {'Nbar':Nbar,'Nstar':Nstar, 'sigma0':self.sigma0, 'deprate':deprate, 'DoverdeltaX2':DoverdeltaX2, 'center_reduction':self.center_reduction, 'sigmastepmax':self.sigmastepmax}
         self.int_params = {'niter':niter,'nx':nx,'ny':ny}
 
         #internal attributes
@@ -197,7 +197,7 @@ class Simulation():
             Nice = np.ones(self.shape)
             Fliq = ds.getNliq_2d_array(Nice,Nstar,Nbar,niter) # Initialize as a pre-equilibrated layer of liquid over ice
 
-            sigmastep_2d = ds.getsigmastep_2d(self.x,self.y,center_reduction,sigmastepmax)
+            sigmastep_2d = ds.getsigmastep_2d(self.x,self.y, center_reduction,sigmastepmax)
             
             if self.noisy_init:
                 # Initialize with noise
