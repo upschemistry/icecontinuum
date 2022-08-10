@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import numpy as np
 from matplotlib import pyplot as plt
 import time
@@ -6,11 +7,8 @@ from copy import copy as dup
 from scipy.integrate import odeint
 #from scipy.integrate import solve_ivp
 from numba import int64
-#from time import time
 
-#for 3d plots
-#from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
-#from mpl_toolkits.mplot3d import Axes3D
+#for animations
 import matplotlib.animation as animation
 
 #for saving simulations
@@ -18,6 +16,9 @@ import pickle
 
 """This module describes a Simulation object that can be used to run simulations of the ice continuum;
     as well as a function to test performance of functions.
+    
+    @Author: Max Bloom
+        contact: mbloom@pugetsound.edu @mbloom1 on GitHub
 """
 
 class Simulation():
@@ -47,10 +48,9 @@ class Simulation():
     load(): loads simulation object from file
     
     @author: Max Bloom 
-        contact: mbloom@pugetsound.edu
     """
 
-    def __init__(self, model, shape, method= "LSODA", atol= 1e-6, rtol= 1e-6):
+    def __init__(self, model, shape, method= "LSODA", atol= 1e-6, rtol= 1e-6, noisy=False, noise_stddev=0.01, layermax=10):
         """Initialize the Simulation
         Parameters
         ----------
@@ -67,14 +67,15 @@ class Simulation():
         self.atol = atol #default absolute tolerance
         self.rtol = rtol #default relative tolerance
         self.shape = shape #shape of initial condition
+        self.dimension = len(shape) #dimension of initial condition
 
         # These are run control parameters
         """ Fliq is the QLL (shape: nx)
             Ntot is the the combined values of the ice layers (Nice), combined with the QLL layer (Nliq or Fliq or NQLL variously referred to as)
                 Ntot is shaped (2, nx)
         """
-        self.noisy_init = False
-        self.noise_std_dev = 0.01
+        self.noisy_init = noisy
+        self.noise_std_dev = noise_stddev
         # Flag for explicit updating Fliq(Ntot) every step 
         self.updatingFliq = True
         # Set up a maximum number of iterations or layers
@@ -89,7 +90,7 @@ class Simulation():
         self.countermax_1D = 15000
         self.countermax_2D = 1000#15000
         
-       
+        #NOTE: the variables below are not part of self so are not saved to file by Simulation.save() (?)
         niter = 1
         #Setting up the 2D system
         #nx = 500 # Number of points in simulation box
@@ -119,6 +120,9 @@ class Simulation():
         dtmaxtimefactor = 50
         dtmax = deltaX**2/D
         self.deltaT = dtmax/dtmaxtimefactor
+        tmax = self.countermax_2D*self.deltaT
+        t0 = 0.0
+
 
         # Deposition rate
         nu_kin = 49 # microns/second
@@ -133,9 +137,38 @@ class Simulation():
         DoverdeltaX2 = D/deltaX**2
         DoverdeltaY2 = D/deltaY**2 #unused
 
-        tmax = self.countermax_2D*self.deltaT
-        # Time steps
-        t0 = 0.0
+        #Save variables not used in model via self.* to an array for saving
+        self._extra_vars = {
+            "Nbar":Nbar,
+            "Nstar":Nstar,
+            "D":D,
+            "dtmax":dtmax,
+            "dtmaxtimefactor":dtmaxtimefactor,
+            "nu_kin":nu_kin,
+            "deprate":deprate,
+            "deprate_times_deltaT":deprate_times_deltaT,
+            "sigma0":sigma0,
+            "sigmastepmax":sigmastepmax,
+            "c_r":c_r,
+            "DoverdeltaX2":DoverdeltaX2,
+            "DoverdeltaY2":DoverdeltaY2,
+            "nx":nx,
+            "ny":ny,
+            "xmax":xmax,
+            "ymax":ymax,
+            "deltaX":deltaX,
+            "deltaY":deltaY,
+            "niter":niter,
+            "t0":t0
+        }
+        self._extra_vars_types = {key:type(value) for key,value in self._extra_vars.items()}
+        
+        # Initialize the results dictionary
+        self._results = {None:None}
+        #Intitialize other internal attributes
+        self._plot = None
+        self._animation = None
+
         #self.tinterval = [t0, tmax] #this is for solve_ivp
         self.tinterval = [t0, self.deltaT] #this is for odeint
 
@@ -158,7 +191,7 @@ class Simulation():
             Nbar, Nstar, sigma0, deprate, DoverdeltaX2, center_reduction, sigmastepmax = self.float_params.values()
             packed_float_params = np.array([Nbar, Nstar, sigma0, deprate, DoverdeltaX2])
             niter, nx, ny = self.int_params.values()
-            packed_int_params = np.array(list(map(int64,self.int_params.values()))) # functions in ds7 require int64
+            packed_int_params = np.array(list(map(int64,self.int_params.values()))) # sigmastep math in f2d in diffusionstuff7 requires int64
 
             # Lay out the system
             Nice = np.ones(self.shape)
@@ -258,7 +291,7 @@ class Simulation():
         #     print('Error in simulation')
             pass
 
-    def plot(self, figurename='', ice=True,tot=False,liq=False, surface=True, contour=False):# -> matplotlib_figure: ## , method = 'surface'): #TODO: test plotting
+    def plot(self, completion=1, figurename='', ice=True,tot=False,liq=False, surface=True, contour=False):# -> matplotlib_figure: ## , method = 'surface'): #TODO: test plotting
         """ Plot the results of the simulation.
         
         Args:
@@ -281,7 +314,15 @@ class Simulation():
         """ plot results of simulation, returns matplotlib figure """
         if self._plot == None:
             #create plot of results
-            Fliq, Ntot = self._results['y'][len(self._results['t'])-1]#get last time step of results
+            num_steps = len(self.results()['t'])
+            step = int((num_steps-1)*completion)
+
+            Fliq, Ntot = [],[]
+            for i in range(num_steps):
+                next_Fliq, next_Ntot = self._results['y'][i]
+                Fliq.append(next_Fliq)
+                Ntot.append(next_Ntot)    
+            Fliq,Ntot = np.array(Fliq), np.array(Ntot)
             Nice = Ntot - Fliq
 
             #access coordinate arrays for plotting
@@ -289,8 +330,8 @@ class Simulation():
 
             # Plot the results
             self._plot = plt.figure(figurename)
-            if self.dimension == 1:
-                if ice:
+            if self.dimension == 0:#NOTE: shape is stil 1d for the zero d model- this is a TODO
+                if ice: 
                     plt.plot(self.t, Nice, label='ice')
                 if tot:
                     plt.plot(self.t, Ntot, label='total')
@@ -299,7 +340,7 @@ class Simulation():
                 plt.legend()
                 plt.xlabel('Time')
                 plt.ylabel('Layers of ice')
-            elif self.dimension == 2:
+            elif self.dimension == 1:
                 if ice:
                     plt.plot(self.x, Nice)
                 if tot:
@@ -308,39 +349,42 @@ class Simulation():
                     plt.plot(self.x, Fliq)
                 plt.xlabel('x')
                 plt.ylabel('Layers of ice')
-            elif self.dimension == 3:
+            elif self.dimension == 2:
                 ax = plt.axes(projection='3d')
                 if surface:
                     if ice:
-                        ax.plot_surface(X=xs, Y=ys, Z=Nice, cmap='viridis')#, vmin=0, vmax=200)
+                        ax.plot_surface(X=xs, Y=ys, Z=Nice[step], cmap='viridis')#, vmin=0, vmax=200)
                     if tot:
-                        ax.plot_surface(X=xs, Y=ys, Z=Ntot, cmap='YlGnBu_r')#, vmin=0, vmax=200)
+                        ax.plot_surface(X=xs, Y=ys, Z=Ntot[step], cmap='YlGnBu_r')#, vmin=0, vmax=200)
                     if liq:
-                        ax.plot_surface(X=xs, Y=ys, Z=Fliq, cmap='YlGnBu_r')
+                        ax.plot_surface(X=xs, Y=ys, Z=Fliq[step], cmap='YlGnBu_r')
                 elif contour: #elif method == 'contour':
                     levels = np.arange(-6,12,0.25)
                     if ice:
-                        ax.contour(xs,ys, Nice, extent=(0, 2, 0, 2), cmap='YlGnBu_r', vmin=0, vmax=200, zorder=1, levels=levels)
+                        ax.contour(xs,ys, Nice[step], extent=(0, 2, 0, 2), cmap='YlGnBu_r', vmin=0, vmax=200, zorder=1, levels=levels)
                     if tot:
-                        ax.contour(xs,ys, Ntot, extent=(0, 2, 0, 2), cmap='YlGnBu_r', vmin=0, vmax=200, zorder=1, levels=levels)
+                        ax.contour(xs,ys, Ntot[step], extent=(0, 2, 0, 2), cmap='YlGnBu_r', vmin=0, vmax=200, zorder=1, levels=levels)
                     if liq:
-                        ax.contour(xs,ys, Fliq, extent=(0, 2, 0, 2), cmap='YlGnBu_r', vmin=0, vmax=200, zorder=1, levels=levels)
+                        ax.contour(xs,ys, Fliq[step], extent=(0, 2, 0, 2), cmap='YlGnBu_r', vmin=0, vmax=200, zorder=1, levels=levels)
             else:
                 print('Error: dimension not supported')
                 return None
         plt.show()
-        return self._plot 
+        #return self._plot 
+        pass
     
-    def animate(self, proportionalSpeed=True, ice=True, tot=False, liq=False, surface=True, crossSection=False):#TODO: test
+    def animate(self, proportionalSpeed=True, ice=True, tot=False, liq=False, surface=True, crossSection=False):
+        #TODO: does not graph in 3d, also does not save animation as instance attribute
         if self._animation == None:
             #create animation of results
-            num_steps = len(self._results['t'])
+            num_steps = len(self.results()['t'])
             #shape of results is (num_steps, 2, nx, ny)
-            Fliq, Ntot = [], []
+            Fliq, Ntot = [],[]
             for step in range(num_steps):
                 next_Fliq, next_Ntot = self._results['y'][step]
                 Fliq.append(next_Fliq)
                 Ntot.append(next_Ntot)    
+            Fliq,Ntot = np.array(Fliq), np.array(Ntot)
             Nice = Ntot - Fliq
             #shape of fliq, ntot and nice should be (num_steps, nx, ny)
 
@@ -348,7 +392,7 @@ class Simulation():
             xs, ys = np.meshgrid(self.x, self.y)
             
             #3d animation of the results
-            plt.figure()
+            self._anim_fig = plt.figure()
             ax = plt.axes(projection='3d')
             def update_surface(num):
                 ax.clear() # remove last iteration of plot 
@@ -360,8 +404,6 @@ class Simulation():
                 ax.set_zlim3d(-self.layermax_2D, self.layermax_2D)
                 ax.set_ylim(0, max(self.y))
                 ax.set_xlim(0, max(self.x))
-                #surface plot
-                xmid = round(np.shape(Nice)[0]/2)
 
                 if surface:
                     plot_func = ax.plot_surface
@@ -371,10 +413,11 @@ class Simulation():
                     plot_func = ax.wireframe
 
                 if crossSection:
+                    xmid = round(np.shape(Nice)[0]/2)
                     if ice:
-                        plot_func(X=xs[xmid:], Y=ys[xmid:], Z=Nice[num][xmid:][:], cmap='viridis')#, vmin=0, vmax=200) #plot half of the surface of the ice
+                        plot_func(X=xs[xmid:], Y=ys[xmid:], Z=Nice[num][xmid:][:],cmap ='viridis')# cmap='viridis')#, vmin=0, vmax=200) #plot half of the surface of the ice
                     if tot:
-                        plot_func(X=xs[xmid:], Y=ys[xmid:], Z=Ntot[num][xmid:][:], cmap='YlGnBu_r')#, vmin=0, vmax=200) #plot half the surface of the QLL
+                        plot_func(X=xs[xmid:], Y=ys[xmid:], Z=Ntot[num][xmid:][:], cmap='cividis')#, vmin=0, vmax=200) #plot half the surface of the QLL
                 else:
                     if ice:
                         plot_func(X=xs, Y=ys, Z=Nice[num], cmap='viridis')#, vmin=0, vmax=200) #plot the surface of the ice 
@@ -382,20 +425,22 @@ class Simulation():
                         plot_func(X=xs, Y=ys, Z=Ntot[num], cmap='YlGnBu_r')#, vmin=0, vmax=200)#plot the surface of the QLL
                 pass
 
-            ani = animation.FuncAnimation(self.plot(), update_surface, num_steps, interval=100, blit=False, cache_frame_data=False, repeat = True)
+            self._animation = animation.FuncAnimation(self._anim_fig, update_surface, num_steps, interval=100, blit=False, cache_frame_data=False, repeat = True)
+            plt.show()
             #if proportionalSpeed:#TODO: scale interval to make length of gif/mp4 be 10 seconds, scaling speed of animation by factor proportional to length of simulation
                 #interval = 
-        return self._animation
 
-    #completed functions below here
+        #return self._animation
+        pass
+
     def results(self) -> dict:
-        """ returns results of simulation (handles running if necessary) """
+        """ Returns results of simulation (handles running if necessary) """
         if self._results == {None:None}:
             self.run()
         return self._results
 
     def save(self, _id = []) -> None:
-        """ saves pickle of simulation object 
+        """ Saves Simulation object to a pickle file
         
         args:
             _id: list of strings to append to filename: what makes this simulation unique
@@ -403,28 +448,33 @@ class Simulation():
         # Saving these results to file
         #if Nice[0] > 100000: #what is this nesh?
         #    Nice -= 100000
-        _id = str('_'+i for i in _id)
+        _id = ''.join('_'+i for i in _id)
         filename = self.model.__name__+'_simulation'+_id+'.pkl'
         with open(filename, 'wb') as f:
             print("saving to", f)
             pickle.dump(self, f)
         pass
 
-    def load(self, filename) -> None:
-        """ loads pickle of simulation object """
+    def load(self, filename: str) -> None:
+        """ Loads and initializes Simulation object from pickle file  """
         with open(filename, 'rb') as f:
             self = pickle.load(f)
         pass
     
     def save_plot(self, filename) -> None:
         """ saves plot of simulation object """
+        if self._plot == None:
+            self.plot()
         #Save the results as an image
         filename = '3d_model_results_'+str(self.layermax_2D)+'_layers'
-        plt.savefig(filename+'.png', dpi=300)
+        self._plot.savefig(filename+'.png', dpi=300)
         pass
 
     def save_animation(self, filename:str, filetype:str) -> None:
         """ saves animation of simulation object """
+        if self._animation == None:
+            self.animate()
+
         try:
             if filetype == 'mp4':
                 Writer = animation.writers['ffmpeg']
@@ -440,13 +490,62 @@ class Simulation():
             print('Error creating animation file writer')
             return
         try:
-            self.animate().save(filename+'.'+filetype, writer=writer)
+            self._animation.save(filename+'.'+filetype, writer=writer)
         except Exception as e:
             print(e)
             print('Error saving animation')
             return
         pass
 
+    def steepness(self, step:int, slice:slice):
+        """ Returns normalized derivative indicating steps of the ice from at given step in a given range/slice"""
+        # unpack results
+        Fliq, Ntot = [],[]
+        for step in range(len(self.results()['t'])):
+            next_Fliq, next_Ntot = self._results['y'][step]
+            Fliq.append(next_Fliq)
+            Ntot.append(next_Ntot)    
+        Fliq,Ntot = np.array(Fliq), np.array(Ntot)
+        Nice = Ntot - Fliq
+
+        step_density= [Nice[step][slice][i+1]-Nice[step][slice][i] for i in range(slice.stop-1)]#difference in thickness from point to point 
+        #step_density = np.mean([Nice[step][slice][i+1]-Nice[step][slice][i] for i in range(slice.stop-1)]) #
+        #normalize step density to extreme value in slice
+        step_density = [step/np.max(list(map(np.abs ,step))) for step in step_density]
+        return step_density
+
+    def get_step_density(self, step:int, slice:slice):
+        """ Returns points in slice at which teh steepness is at an extreme value """
+        # unpack results
+        Fliq, Ntot = [],[]
+        for step in range(len(self.results()['t'])):
+            next_Fliq, next_Ntot = self._results['y'][step]
+            Fliq.append(next_Fliq)
+            Ntot.append(next_Ntot)    
+        Fliq,Ntot = np.array(Fliq), np.array(Ntot)
+        Nice = Ntot - Fliq
+
+        #print('np.shape(Nice)', np.shape(Nice))
+        #print('np.shape(Nice[step])' , np.shape(Nice[step]))
+        #print('np.shape(Nice[step][slice])',np.shape(Nice[step][slice]))
+
+        ymid = np.shape(Nice)[1]//2
+
+        step_density= [Nice[step][slice][i+1][ymid]-Nice[step][slice][i][ymid] for i in range(slice.stop-1)]#difference in thickness from point to point
+        #print('shape of step_density', np.shape(step_density))
+        second_deriv = [step_density[i+1]-step_density[i] for i in range(len(step_density)-1)]#difference in slope from point to point
+        #print('shape of second_deriv', np.shape(second_deriv))
+        print(np.min(list(map(np.abs,second_deriv))))#find the minimum step to see how close to zero the the second derivative gets
+
+        #print(second_deriv)
+        zeroes_of_step_density = [0]#[i for i in second_deriv if np.abs(i)< 1e-04] #indices of points where step density is 'zero'
+        for i in second_deriv:
+            if np.abs(i)< 1e-04:
+                zeroes_of_step_density.append(1)
+            else:
+                zeroes_of_step_density.append(0)
+        zeroes_of_step_density.append(0)#NOTE: two extra zeros to normalize size of zeroes_of_step_density to slice
+        return zeroes_of_step_density
 
 """
 Performance testing functions for the ice model.
