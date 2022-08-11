@@ -325,14 +325,14 @@ def f2d_ivp(t, y, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep ne
     derivs = np.stack((dFliq0_dt,dNtot_dt),axis=0) #shape (2,nx,ny)
     return derivs
 
-@njit(float64[:](float64[:],float64,float64,float64,types.unicode_type))
-def getsigmastep(x,xmax,center_reduction,sigmastepmax,method='parabolic'): 
+@njit(float64[:](float64[:],float64,float64,float64))#,types.unicode_type))
+def getsigmastep(x,xmax,center_reduction,sigmastepmax):#,method='parabolic'): 
     sigmapfac = 1-center_reduction/100 #float64
     xmid = max(x)/2 #float64
     try:
-        if method == 'sinusoid':
-            fsig = (np.cos(x/xmax*np.pi*2)+1)/2*(1-sigmapfac)+sigmapfac
-        elif method == 'parabolic':
+        #if method == 'sinusoid':
+        #    fsig = (np.cos(x/xmax*np.pi*2)+1)/2*(1-sigmapfac)+sigmapfac
+        #elif method == 'parabolic':
             fsig = (x-xmid)**2/xmid**2*(1-sigmapfac)+sigmapfac
     except:
         print('bad method')
