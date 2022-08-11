@@ -80,7 +80,7 @@ class Simulation():
 
         ### Experimental arguments ###
         Nbar = 1.0 # new Nbar from VMD, 260K
-        Nstar = .9/(2*np.pi)
+        Nstar = .9/(2*np.pi) # ~=0.14137
         D = 0.02e-2 # micrometers^2/microsecond # Diffusion coefficient #TODO: temperature dependent?
         nmpermonolayer = 0.3 #Thickness of a monolayer of ice #TODO: Citation? Sazaki et al. said 0.34 nm per monolayer
         umpersec_over_mlyperus = (nmpermonolayer/1e3*1e6)# Conversion of nanometers per monolayer to micron/sec over monolayers/microsecond
@@ -132,7 +132,7 @@ class Simulation():
             DoverdeltaX2 = D/deltaX**2 # Diffusion coefficient scaled for this time-step and space-step
 
             #center_reduction unused by 0d model
-            self.center_reduction = 0.5 #1.0 #0.25 # In percent #last exp. parameter
+            self.center_reduction = 0.25 # In percent #last exp. parameter
             c_r = self.center_reduction/100
 
             # Time steps
@@ -457,8 +457,8 @@ class Simulation():
                 print('Error: dimension not supported')
                 return None
         plt.show()
-        #return self._plot 
-        pass
+        return self._plot 
+        #pass
     
     def animate(self, proportionalSpeed=True, ice=True, tot=False, liq=False, surface=True, crossSection=False):
         """ Animate the results of the simulation.
