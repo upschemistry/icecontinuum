@@ -6,7 +6,7 @@ Created on Tue Jul 14 15:01:47 2015
 """
 import numpy as np
 import copy
-from numba import prange,njit
+from numba import prange,njit,int32
 #NOTE: as of june 20 2022, the only functions that are used in continuum_model6 
 #       are those with explicit type signatures.
 
@@ -211,7 +211,7 @@ def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
     niter, nx = int_params
 
     # unpack current values of y
-    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(2,nx))
+    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(int32(2),nx))
     
     # Deposition
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
