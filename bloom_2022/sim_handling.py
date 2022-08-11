@@ -184,6 +184,7 @@ class Simulation():
         #Intitialize other internal attributes
         self._plot = None
         self._animation = None
+        self._rerun = False
 
         # Initializing model arguments
         if self.dimension == 0:
@@ -204,7 +205,10 @@ class Simulation():
         self._results = {None:None} #solve_ivp (-like) dictionary of results
         pass
 
-    def run(self) -> None:
+    def run(self, print_progress=True, print_count_layers=False) -> None:
+        if self._results != {None:None}:
+            #already been run: tell plot/animation to update when called again since it is has been run again
+            self._rerun = True
         """handles running the simulation"""
         #unpack parameters
         if self.dimension >= 0:
@@ -226,7 +230,7 @@ class Simulation():
             packed_float_params = np.array([Nbar, Nstar, sigma0, deprate, DoverdeltaX2])
             packed_int_params = np.array(list(map(int32,[niter,nx])))#f1d expects int32s
         if self.dimension == 2:
-            DoverdeltaY2 = self.float_params['DoverdeltaY2'] #unused
+            #DoverdeltaY2 = self.float_params['DoverdeltaY2'] #unused
             ny = self.int_params['ny']
             
             #packed_float_params = np.array([Nbar, Nstar, sigma0, deprate, DoverdeltaX2])
@@ -316,13 +320,18 @@ class Simulation():
             if (layer-lastlayer) > 0:
                 minpoint = np.min(Nice)
                 maxpoint = np.max(Nice)
-                print(counter-1, lastlayer, maxpoint-minpoint, maxpoint-minpoint-lastdiff)
+                if print_count_layers:
+                    if counter == 1:
+                        #print what each thing is
+                        print('counter, layer, depth_of_facet_in_layers, delta_depth')
+                    print(counter-1, lastlayer, maxpoint-minpoint, maxpoint-minpoint-lastdiff)
                 lastdiff = maxpoint-minpoint
                 lastlayer += 1
                 
             # Test whether we're finished
             if self.uselayers:
-                print("appx progress:" , round((layer/(self.layermax-1))*100, 2),"%",end="\r")
+                if print_progress:
+                    print("appx progress:" , round((layer/(self.layermax-1))*100, 2),"%",end="\r")
                 if self.sigmastepmax > 0:
                     if layer > self.layermax-1:
                         print('breaking because reached max number of layers grown')
@@ -351,6 +360,12 @@ class Simulation():
         #                     dtmaxtimefactor = dtmaxtimefactor,
         #                     deltaT = deltaT
         pass
+    
+    def results(self) -> dict:
+        """ Returns results of simulation (handles running if necessary) """
+        if self._results == {None:None}:
+            self.run()
+        return self._results
 
     def plot(self, completion=1, figurename='', ice=True,tot=False,liq=False, surface=True, contour=False):# -> matplotlib_figure: ## , method = 'surface'): #TODO: test plotting
         """ Plot the results of the simulation.
@@ -373,7 +388,7 @@ class Simulation():
         
         """
         """ plot results of simulation, returns matplotlib figure """
-        if self._plot == None:
+        if self._plot == None or self._rerun:
             #create plot of results
             num_steps = len(self.results()['t'])
             step = int((num_steps-1)*completion)
@@ -408,11 +423,12 @@ class Simulation():
             elif self.dimension == 1:
                 ax = plt.axis()
                 if ice:
-                    plt.plot(self.x, Nice[step])
+                    plt.plot(self.x, Nice[step], 'k', label='ice')
                 if tot:
-                    plt.plot(self.x, Ntot[step])
+                    plt.plot(self.x, Ntot[step], 'b', label='ice+QLL')
+                    #plt.plot(x-xmid, Fliq+Nice-minpoint, 'b', label='ice+liquid', lw=linewidth)
                 if liq:
-                    plt.plot(self.x, Fliq[step])
+                    plt.plot(self.x, Fliq[step], 'g', label='QLL')
                 plt.xlabel(r'x ($\mu m$)')
                 plt.ylabel('Layers of ice')
             elif self.dimension == 2:
@@ -525,12 +541,6 @@ class Simulation():
         plt.show()
         #return self._animation
         pass
-
-    def results(self) -> dict:
-        """ Returns results of simulation (handles running if necessary) """
-        if self._results == {None:None}:
-            self.run()
-        return self._results
 
     def save(self, _id = []) -> None:
         """ Saves Simulation object to a pickle file
