@@ -518,7 +518,7 @@ class Simulation():
                 pass
 
             if proportionalSpeed:#TODO: scale interval to make length of gif/mp4 be 10 seconds, scaling speed of animation by factor proportional to length of simulation
-                intrvl = int(50*30/layermax_2D)#targeting speeds similar to 50ms interval at 30 layers, if more layers it will speed it up to keep the animation at the same visual speed
+                intrvl = int(50*30/self.layermax)#targeting speeds similar to 50ms interval at 30 layers, if more layers it will speed it up to keep the animation at the same visual speed
             else:
                 intrvl = 50
             self._animation = animation.FuncAnimation(self._anim_fig, update_surface, num_steps, interval=intrvl, blit=False, cache_frame_data=False, repeat = True)
