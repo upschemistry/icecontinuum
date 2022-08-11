@@ -1,4 +1,6 @@
-# -*- coding: utf-8 -*-
+from ctypes import py_object
+from pickletools import pybool
+from turtle import update
 import numpy as np
 from matplotlib import pyplot as plt
 import time
@@ -18,7 +20,7 @@ import pickle
     as well as a function to test performance of functions.
     
     @Author: Max Bloom
-        contact: mbloom@pugetsound.edu @mbloom1 on GitHub
+        contact: mbloom@pugetsound.edu @mbloom0 on GitHub
 """
 
 class Simulation():
@@ -48,10 +50,16 @@ class Simulation():
     save(): saves simulation object to file
     load(): loads simulation object from file
     
+    save_plot(): saves plot of simulation object
+    save_animation(): saves animation of simulation object
+    steepness(): returns normalized derivative, goal of indicating where steps of the ice are at given step in a given range/slice
+    steady_state(): removes 
+
+    
     @author: Max Bloom 
     """
 
-    def __init__(self, model, shape, method= "LSODA", atol= 1e-6, rtol= 1e-6, noisy=False, noise_stddev=0.01, layermax=0):
+    def __init__(self, model=None, shape=(None,), method= "LSODA", atol= 1e-6, rtol= 1e-6, noisy=False, noise_stddev=0.01, layermax=0):
         """Initialize the Simulation
         Parameters
         ----------
@@ -347,18 +355,6 @@ class Simulation():
         
         #solve_ivp does not support terminating after a given number of layers
         #self._results = solve_ivp(self.model, self.t_span, self.y0, t_eval=self.t_eval, method=self.method, atol=self.atol, rtol=self.rtol, args=self._args)
-
-        #TODO: save parameters that the model needs
-        # Nice=Nicekeep, Fliq=Fliqkeep,
-        #                     x=x, t=tkeep, 
-        #                     Nbar=Nbar, Nstar=Nstar,
-        #                     sigma0=sigma0, c_r=c_r, D=D, L=L, 
-        #                     nu_kin=nu_kin, nu_kin_ml=nu_kin_ml, 
-        #                     sigmastepmax=sigmastepmax, sigmastepstyle=sigmastepstyle,
-        #                     ykeep_0Darr=ykeep_0Darr,
-        #                     tkeep_0D=tkeep_0D,  
-        #                     dtmaxtimefactor = dtmaxtimefactor,
-        #                     deltaT = deltaT
         pass
     
     def results(self) -> dict:
@@ -429,6 +425,7 @@ class Simulation():
                     #plt.plot(x-xmid, Fliq+Nice-minpoint, 'b', label='ice+liquid', lw=linewidth)
                 if liq:
                     plt.plot(self.x, Fliq[step], 'g', label='QLL')
+                plt.legend()
                 plt.xlabel(r'x ($\mu m$)')
                 plt.ylabel('Layers of ice')
             elif self.dimension == 2:
@@ -495,15 +492,33 @@ class Simulation():
             Fliq,Ntot = np.array(Fliq), np.array(Ntot)
             Nice = Ntot - Fliq
             #shape of fliq, ntot and nice should be (num_steps, nx, ny)
-
-            #access coordinate arrays for plotting
-            xs, ys = np.meshgrid(self.x, self.y)
-            
-            #3d animation of the results
             self._anim_fig = plt.figure()
-            ax = plt.axes(projection='3d')
-            def update_surface(num):
-                ax.clear() # remove last iteration of plot 
+            global update_fig
+            if self.dimension == 1:
+                #2d animation of 1d model over time
+                plt.xlabel(r'x ($\mu m$)')
+                plt.ylabel('Layers of ice')
+                ax = plt.axes()
+                ax.set_xlim(min(self.x-0.5), max(self.x+0.5))
+                def update_fig(num):
+                    ax.clear()
+                    ax.set_ylim(min(Nice[num]-0.5), max(Ntot[num]+0.5))
+                    if ice:
+                        ax.plot(self.x, Nice[num], 'k', label='ice')
+                    if tot:
+                        ax.plot(self.x, Ntot[num], 'b', label='ice+QLL')
+                    if liq:
+                        ax.plot(self.x, Fliq[num], 'g', label='QLL')
+                        ax.set_ylim(min(Fliq[num]-0.5), max(Ntot[num]+0.5))
+                    pass
+                ax.legend()
+            elif self.dimension == 2: 
+                #access coordinate arrays for plotting
+                xs, ys = np.meshgrid(self.x, self.y)
+
+                #3d animation of the results
+                
+                ax = plt.axes(projection='3d')
                 #labels
                 ax.set_xlabel(r'$x (\mu m$)')#,fontsize=fontsize)
                 ax.set_ylabel(r'$y (\mu m$)')#,fontsize=fontsize)
@@ -512,35 +527,38 @@ class Simulation():
                 ax.set_zlim3d(-self.layermax, self.layermax)
                 ax.set_ylim(0, max(self.y))
                 ax.set_xlim(0, max(self.x))
+                def update_fig(num):
+                    ax.clear() # remove last iteration of plot 
+                    if surface:
+                        plot_func = ax.plot_surface
+                    #elif contour: #elif method == 'contour':
+                    #    plot_func = ax.contour
+                    else:
+                        plot_func = ax.wireframe
 
-                if surface:
-                    plot_func = ax.plot_surface
-                #elif contour: #elif method == 'contour':
-                #    plot_func = ax.contour
-                else:
-                    plot_func = ax.wireframe
-
-                if crossSection:
-                    xmid = round(np.shape(Nice)[0]/2)
-                    if ice:
-                        plot_func(X=xs[xmid:], Y=ys[xmid:], Z=Nice[num][xmid:][:],cmap ='viridis')# cmap='viridis')#, vmin=0, vmax=200) #plot half of the surface of the ice
-                    if tot:
-                        plot_func(X=xs[xmid:], Y=ys[xmid:], Z=Ntot[num][xmid:][:], cmap='cividis')#, vmin=0, vmax=200) #plot half the surface of the QLL
-                else:
-                    if ice:
-                        plot_func(X=xs, Y=ys, Z=Nice[num], cmap='viridis')#, vmin=0, vmax=200) #plot the surface of the ice 
-                    if tot:
-                        plot_func(X=xs, Y=ys, Z=Ntot[num], cmap='YlGnBu_r')#, vmin=0, vmax=200)#plot the surface of the QLL
-                pass
-
+                    if crossSection:
+                        xmid = round(np.shape(Nice)[0]/2)
+                        if ice:
+                            plot_func(X=xs[xmid:], Y=ys[xmid:], Z=Nice[num][xmid:][:],cmap ='viridis')# cmap='viridis')#, vmin=0, vmax=200) #plot half of the surface of the ice
+                        if tot:
+                            plot_func(X=xs[xmid:], Y=ys[xmid:], Z=Ntot[num][xmid:][:], cmap='cividis')#, vmin=0, vmax=200) #plot half the surface of the QLL
+                    else:
+                        if ice:
+                            plot_func(X=xs, Y=ys, Z=Nice[num], cmap='viridis')#, vmin=0, vmax=200) #plot the surface of the ice 
+                        if tot:
+                            plot_func(X=xs, Y=ys, Z=Ntot[num], cmap='YlGnBu_r')#, vmin=0, vmax=200)#plot the surface of the QLL
+                    pass
+            
+            #create animation
             if proportionalSpeed:#TODO: scale interval to make length of gif/mp4 be 10 seconds, scaling speed of animation by factor proportional to length of simulation
                 intrvl = int(50*30/self.layermax)#targeting speeds similar to 50ms interval at 30 layers, if more layers it will speed it up to keep the animation at the same visual speed
             else:
                 intrvl = 50
-            self._animation = animation.FuncAnimation(self._anim_fig, update_surface, num_steps, interval=intrvl, blit=False, cache_frame_data=False, repeat = True)
+            #self._animation = animation.FuncAnimation(self._anim_fig, update_fig, num_steps, interval=intrvl, blit=False, cache_frame_data=False, repeat = True)
+            anim = animation.FuncAnimation(self._anim_fig, update_fig, num_steps, interval=intrvl, blit=False, cache_frame_data=False, repeat = True) #pickle does not like saving animation, also it is a a lot of data to save
         plt.show()
-        #return self._animation
-        pass
+        return anim#self._animation
+        #pass
 
     def save(self, _id = []) -> None:
         """ Saves Simulation object to a pickle file
@@ -558,11 +576,11 @@ class Simulation():
             pickle.dump(self, f)
         pass
 
-    def load(self, filename: str) -> None:
+    def load(self, filename: str) -> py_object:
         """ Loads and initializes Simulation object from pickle file  """
         with open(filename, 'rb') as f:
             self = pickle.load(f)
-        pass
+        return self
     
     def save_plot(self, filename) -> None:
         """ saves plot of simulation object """
@@ -649,6 +667,56 @@ class Simulation():
                 zeroes_of_step_density.append(0)
         zeroes_of_step_density.append(0)#NOTE: two extra zeros to normalize size of zeroes_of_step_density to slice
         return zeroes_of_step_density
+    
+    def normalize_results_to_min(self):
+        Fliq, Ntot = [],[]
+        for step in range(len(self.results()['t'])):
+            next_Fliq, next_Ntot = self._results['y'][step]
+            #normalize results
+            next_Fliq = next_Fliq - np.min(next_Fliq)
+            next_Ntot = next_Ntot - np.min(next_Ntot)
+            Fliq.append(next_Fliq)
+            Ntot.append(next_Ntot)
+        return Fliq, Ntot
+        
+    def steady_state_calc(self):
+        # unpack results
+        Fliq, Ntot = self.normalize_results_to_min()
+        flast,ntotlast = 0,0
+        normalizedFliq,normalizedNtot=[],[]
+        for f,n in zip(Fliq,Ntot):
+            f,n = f-flast,n-ntotlast
+            normalizedFliq.append(f)
+            normalizedNtot.append(n)
+            flast,ntotlast = f,n
+        
+        #normalizedFliq,normalizedNtot = np.array(Fliq), np.array(Ntot)
+        #normalizedNice = normalizedNtot - normalizedFliq
+        return normalizedFliq, normalizedNtot
+
+    def get_expected_nss_steps(self):
+        #Calculating number of expected steps to reach steady state
+        L = np.max(self.x)/2; print(L) # micrometers
+        c_r = self.center_reduction / 100; print(c_r) # dimensionless
+        nu_kin_ml = self._extra_vars['deprate']; print(nu_kin_ml) # monolayers per microsecond
+        sigma_I = self.sigmastepmax; print(sigma_I) # dimensionless
+        #print(self._extra_vars['D']) # D is in micrometers^2/microsecond
+        M = np.array([.0027, .0025])
+        B = np.array([2.9, 1.59])
+        beta = np.array([0.65, 0.65])
+        xfactor = nu_kin_ml*L**2*c_r**beta*sigma_I/self._extra_vars['D']
+        NSS = M*xfactor + B
+        print('Nss predicted')
+        print('sinusoid:', NSS[0])
+        print('parabolic:', NSS[1])
+        return NSS
+
+
+def loadSim(filename: str) -> py_object:
+        """ Loads and initializes Simulation object from pickle file  """
+        with open(filename, 'rb') as f:
+            self = pickle.load(f)
+        return self
 
 """
 Performance testing functions for the ice model.
@@ -667,6 +735,7 @@ def multiple_test_avg_time(func, args, n_tests = 50):
     avg_time_taken = float(np.mean(times))
     print("Time to run "+str(func.__name__)+" on average for "+ str(n_tests) +" tests: ", avg_time_taken, "seconds")
     return avg_time_taken
+
 
 # idea for a function but ?????
 # def runSimulations(params_array) -> dict:

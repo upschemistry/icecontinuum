@@ -8,7 +8,8 @@ Created on Tue Jul 14 15:01:47 2015
 import numpy as np
 from numba import njit, float64, types
 
-prll_bool = True
+prll_1d = False # 1d faster without parallelization
+prll_2d = True  # 2d faster with parallelization
 
 @njit("f8(f8,f8,f8,f8)") 
 def fqll_next(fqll_last,Ntot,Nstar,Nbar):
@@ -16,13 +17,13 @@ def fqll_next(fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
     return 1 + fstar*np.sin(2*np.pi*(Ntot-Nbar*fqll_last))
 
-@njit("f8[:](f8[:],f8[:],f8,f8)", parallel=prll_bool)
+@njit("f8[:](f8[:],f8[:],f8,f8)", parallel=prll_1d)
 def fqll_next_array(fqll_last,Ntot,Nstar,Nbar):
     #Ntot is a list of the amount of each type of ice
     fstar = Nstar/Nbar
     return 1 + fstar*np.sin(2*np.pi*(Ntot-Nbar*fqll_last))
 
-@njit("f8[:,:](f8[:,:],f8[:,:],f8,f8)", parallel=prll_bool)
+@njit("f8[:,:](f8[:,:],f8[:,:],f8,f8)", parallel=prll_2d)
 def fqll_next_2d_array(fqll_last,Ntot,Nstar,Nbar):
     #Ntot is a list of the amount of each type of ice
     fstar = Nstar/Nbar
@@ -61,12 +62,12 @@ def getdfqll_dNtot_next(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
     return fstar*np.cos(2*np.pi*(Ntot-fqll_last))*2*np.pi*(1-Nbar*dfqll_dNtot_last)
 
-@njit("f8[:](f8[:],f8[:],f8[:],f8,f8)",parallel=prll_bool) #quirk: fqll_last is a float but must be array for above implemenetation
+@njit("f8[:](f8[:],f8[:],f8[:],f8,f8)",parallel=prll_1d) #quirk: fqll_last is a float but must be array for above implemenetation
 def getdfqll_dNtot_next_array(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
     return fstar*np.cos(2*np.pi*(Ntot-fqll_last))*2*np.pi*(1-Nbar*dfqll_dNtot_last)
 
-@njit("f8[:,:](f8[:,:],f8[:,:],f8[:,:],f8,f8)",parallel=prll_bool) #quirk: fqll_last is a float but must be array for above implemenetation
+@njit("f8[:,:](f8[:,:],f8[:,:],f8[:,:],f8,f8)",parallel=prll_2d) #quirk: fqll_last is a float but must be array for above implemenetation
 def getdfqll_dNtot_next_2d_array(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
     return fstar*np.cos(2*np.pi*(Ntot-fqll_last))*2*np.pi*(1-Nbar*dfqll_dNtot_last)
@@ -80,7 +81,7 @@ def getdNliq_dNtot(Ntot,Nstar,Nbar,niter):
         fqll_last = fqll_next(fqll_last,Ntot,Nstar,Nbar)
     return dfqll_dNtot_last*Nbar 
 
-@njit("f8[:](f8[:],f8,f8,i4)",parallel=prll_bool)
+@njit("f8[:](f8[:],f8,f8,i4)",parallel=prll_1d)
 def getdNliq_dNtot_array(Ntot,Nstar,Nbar,niter):
     dfqll_dNtot_last = np.zeros(np.shape(Ntot)[0])
     fqll_last = np.ones(np.shape(Ntot)[0])
@@ -89,7 +90,7 @@ def getdNliq_dNtot_array(Ntot,Nstar,Nbar,niter):
         fqll_last = fqll_next_array(fqll_last,Ntot,Nstar,Nbar)
     return dfqll_dNtot_last*Nbar 
 
-@njit("f8[:,:](f8[:,:],f8,f8,i4)", parallel=prll_bool)
+@njit("f8[:,:](f8[:,:],f8,f8,i4)", parallel=prll_2d)
 def getdNliq_dNtot_2d_array(Ntot,Nstar,Nbar,niter):
     m,n = np.shape(Ntot)
     s = (m,n)
@@ -119,7 +120,7 @@ def f0d(y, t, float_params, niter):
     derivs = np.array([dFliq0_dt, dNtot_dt])
     return derivs
 
-@njit("f8[:](f8[:],f8)",parallel=prll_bool)
+@njit("f8[:](f8[:],f8)",parallel=prll_1d)
 def diffuse_1d(Fliq0,DoverdeltaX2):
     l = len(Fliq0)
     dy = np.zeros((l,))#np.shape(Fliq0))
@@ -130,7 +131,7 @@ def diffuse_1d(Fliq0,DoverdeltaX2):
         dy[l-1] = DoverdeltaX2*(Fliq0[0]-2*Fliq0[l-1]+Fliq0[l-2])
     return dy
 
-@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])")#,parallel=prll_bool)#slower with paralellization right now
+@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])",parallel=prll_1d)#slower with paralellization right now
 def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
     """ odeint function for the one-dimensional ice model """
      # unpack parameters
@@ -138,9 +139,8 @@ def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
     niter, nx = int_params
 
     # unpack current values of y
-    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(types.int32(2),types.int32(nx)))#TODO c
+    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(types.int32(2),types.int32(nx)))
     
-    # Deposition
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
     sigD = (sigmastep - delta * sigma0)/(1+delta*sigma0)
     depsurf = deprate * sigD
@@ -159,7 +159,7 @@ def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
     derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx)
     return derivs
 
-@njit(float64[:](float64,float64[:],float64,types.int64[:]), parallel=prll_bool)
+@njit(float64[:](float64,float64[:],float64,types.int64[:]), parallel=prll_2d)
 def diffuse_2d(t,y,D,shape):
     """ Applies numerical solution to find diffusive effects at each time step. Fliq0 is flattened 2d array of shape shape.
     
@@ -209,59 +209,7 @@ def diffuse_2d(t,y,D,shape):
             
     return np.reshape(dy,(m*n))
 
-@njit(float64[:,:](float64,float64[:,:],float64), parallel=prll_bool)
-def diffuse_2d_ivp(t,y,D):
-    """ Applies numerical solution to find diffusive effects at each time step. Fliq0 is flattened 2d array of shape shape.
-    
-    Parameters
-    ----------
-    Fliq0 : 2D Numpy Array 
-        The thickness of the liquid over a 2D area
-
-    t : float
-        The time step-- unused- placeholder for odeint
-
-    D : float64
-        Diffusion coefficient -- divided by deltaX^2??? #TODO needs to be divided by 
-                                            #TODO: cont.      x^2 or y^2 inside this function in order to have non-square discretization
-
-    shape : tuple
-        The shape of the 2D array Fliq0
-
-    Returns
-    -------
-    dy : Flattened 2D Numpy Array
-        The change to the thickness of the liquid at each point in the 2d area over
-         the time step
-    """
-    Fliq0 = y
-    #m,n = shape
-    #Fliq0 = np.reshape(np.ascontiguousarray(Fliq0),(m,n)) #reshaping required for odeint/solve_ivp
-    m,n = np.shape(Fliq0)
-    dy = np.zeros((m,n)) 
-    for i in range(0,m): #go from left column to right
-        for j in range(0,n): #go from top row to bottom
-
-            ip1=i+1
-            jp1=j+1
-            # Boundary Conditions (periodic at ends) #TODO: test this
-           
-            if i == m-1: #take care of right column condition wrapping to left edge
-                ip1 = 0
-
-            if j == n-1: #take care of bottom edge wrapping to top edge
-                jp1 = 0
-
-            ux = (Fliq0[ip1,j] - 2*Fliq0[i,j] + Fliq0[i-1,j])
-            uy = (Fliq0[i,jp1] - 2*Fliq0[i,j] + Fliq0[i,j-1])
-
-            dy[i,j] = D*(ux+uy)
-            
-    #return np.reshape(dy,(m*n))
-    return dy
-
-
-@njit("f8[:](f8[:],f8,f8[:],i8[:],f8[:,:])",parallel=prll_bool)
+@njit("f8[:](f8[:],f8,f8[:],i8[:],f8[:,:])",parallel=prll_2d)
 def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs to become 2D -- use vaporfield 3d data
     """ 2D version of f1d """
 
@@ -274,11 +222,17 @@ def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs 
     # unpack current values of y
     Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(types.int32(2),types.int32(nx),types.int32(ny)))
     
-    # Deposition
+    # Deposition -- sigmastep going negative causing ablation at center of Ntot?? -no- but when delta*sigma0 is larger thasn sigmastep(near center), it creates ablation at center.
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
+    #print('Fliq0: ', Fliq0)
+    #print('Nbar - Nstar: ', Nbar - Nstar)
+    #print('delta: ',delta)
     sigD = (sigmastep - delta * sigma0)/(1+delta*sigma0)
+    #print('sigD: ',sigD)
     depsurf = deprate * sigD
+    print('depsurf quartersection: ',depsurf[:depsurf.shape[0]//2,:depsurf.shape[1]//2])
     dFliq0_dt = getdNliq_dNtot_2d_array(Ntot0,Nstar,Nbar,niter)*depsurf
+
     dNtot_dt = depsurf
 
     # if diffusion:
@@ -290,39 +244,6 @@ def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs 
 
     # Package for output
     derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx*ny)
-    return derivs
-
-@njit("f8[:,:,:](f8,f8[:,:,:],f8[:],i8[:],f8[:,:])",parallel=prll_bool)
-def f2d_ivp(t, y, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs to become 2D -- use vaporfield 3d data
-    """ 2D version of f1d """
-
-    # diffusion = True
-
-    # unpack parameters
-    Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
-    niter, nx, ny = int_params
-
-    # unpack current values of y
-    #Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(types.int32(2),types.int32(nx),types.int32(ny)))
-    Fliq0, Ntot0 = y
-    
-    # Deposition
-    delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
-    sigD = (sigmastep - delta * sigma0)/(1+delta*sigma0)
-    depsurf = deprate * sigD
-    dFliq0_dt = getdNliq_dNtot_2d_array(Ntot0,Nstar,Nbar,niter)*depsurf
-    dNtot_dt = depsurf
-
-    # if diffusion:
-    # Diffusion
-    dy = diffuse_2d_ivp(t, Fliq0, DoverdeltaX2)
-    # Combined
-    dFliq0_dt += dy
-    dNtot_dt += dy
-
-    # Package for output
-    #derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx*ny)
-    derivs = np.stack((dFliq0_dt,dNtot_dt),axis=0) #shape (2,nx,ny)
     return derivs
 
 @njit(float64[:](float64[:],float64,float64,float64))#,types.unicode_type))
