@@ -30,7 +30,7 @@ def fqll_next_2d_array(fqll_last,Ntot,Nstar,Nbar):
     return 1 + fstar*np.sin(2*np.pi*(Ntot-Nbar*fqll_last))
 
 @njit("f8(f8,f8,f8,i4)") #Ntot is float in this case, Nstar and Nbar are floats, niter is an int literal
-def getNliq(Ntot,Nstar,Nbar,niter):
+def getNliq(Ntot,Nstar,Nbar,niter):#used to update fliq every iteration of odeint (to prevent drift /numerical instabilities)
     fqll_last = 1.0
     for i in range(niter):
         fqll_last = fqll_next(fqll_last,Ntot,Nstar,Nbar)
@@ -52,7 +52,7 @@ def getNliq_2d_array(Ntot,Nstar,Nbar,niter):
         fqll_last = fqll_next_2d_array(fqll_last,Ntot,Nstar,Nbar)
     return fqll_last*Nbar
 
-@njit("f8[:](f8[:],f8[:],f8,f8)")
+@njit("f8[:](f8[:],f8[:],f8,f8)") #NOTE not currently used in the models
 def fqllprime_next(fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
     return 1 + fstar*np.sin(2*np.pi*(Ntot-Nbar*fqll_last))
@@ -230,7 +230,7 @@ def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs 
     sigD = (sigmastep - delta * sigma0)/(1+delta*sigma0)
     #print('sigD: ',sigD)
     depsurf = deprate * sigD
-    print('depsurf quartersection: ',depsurf[:depsurf.shape[0]//2,:depsurf.shape[1]//2])
+    print('depsurf quartersection: ',depsurf[:depsurf.shape[0]//2,:depsurf.shape[1]//2]) #TODO
     dFliq0_dt = getdNliq_dNtot_2d_array(Ntot0,Nstar,Nbar,niter)*depsurf
 
     dNtot_dt = depsurf
