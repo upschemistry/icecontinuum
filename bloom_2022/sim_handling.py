@@ -1,6 +1,4 @@
 from ctypes import py_object
-from pickletools import pybool
-from turtle import update
 import numpy as np
 from matplotlib import pyplot as plt
 import time
@@ -560,17 +558,17 @@ class Simulation():
         return anim#self._animation
         #pass
 
-    def save(self, _id = []) -> None:
+    def save(self, id = []) -> None:
         """ Saves Simulation object to a pickle file
         
         args:
-            _id: list of strings to append to filename: what makes this simulation unique
+            id: list of strings to append to filename: what makes this simulation unique
         """
         # Saving these results to file
         #if Nice[0] > 100000: #what is this nesh?
         #    Nice -= 100000
-        _id = ''.join('_'+i for i in _id)
-        filename = self.model.__name__+'_simulation'+_id+'.pkl'
+        id = ''.join('_'+i for i in id)
+        filename = self.model.__name__+'_simulation'+id+'.pkl'
         with open(filename, 'wb') as f:
             print("saving to", f)
             pickle.dump(self, f)
@@ -692,7 +690,22 @@ class Simulation():
         
         #normalizedFliq,normalizedNtot = np.array(Fliq), np.array(Ntot)
         #normalizedNice = normalizedNtot - normalizedFliq
-        return normalizedFliq, normalizedNtot
+        return np.array(normalizedFliq), np.array(normalizedNtot)
+    
+    def percent_change_from_last_step(self):
+        # unpack results
+        Fliq, Ntot = self.normalize_results_to_min()
+        flast,ntotlast = Fliq[0],Ntot[0] #step 0
+        normalizedFliq,normalizedNtot=[1],[1] # 100% change at initialization
+        for f,n in zip(Fliq[1:],Ntot[1:]):
+            f,n = f/flast,n/ntotlast #percent change in decimal form
+            normalizedFliq.append(f)
+            normalizedNtot.append(n)
+            flast,ntotlast = f,n
+        
+        #normalizedFliq,normalizedNtot = np.array(Fliq), np.array(Ntot)
+        #normalizedNice = normalizedNtot - normalizedFliq
+        return np.array(normalizedFliq), np.array(normalizedNtot)
 
     def get_expected_nss_steps(self):
         #Calculating number of expected steps to reach steady state
