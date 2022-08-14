@@ -6,7 +6,8 @@ Created on Tue Jul 14 15:01:47 2015
 """
 
 import numpy as np
-from numba import njit, float64, types
+import math
+from numba import njit, float64, types,vectorize
 
 prll_1d = False # 1d faster without parallelization
 prll_2d = True  # 2d faster with parallelization
@@ -23,11 +24,12 @@ def fqll_next_array(fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
     return 1 + fstar*np.sin(2*np.pi*(Ntot-Nbar*fqll_last))
 
-@njit("f8[:,:](f8[:,:],f8[:,:],f8,f8)", parallel=prll_2d)
+#@njit("f8[:,:](f8[:,:],f8[:,:],f8,f8)", parallel=prll_2d)
+@vectorize(["float64(float64,float64,float64,float64)"], target='cuda')
 def fqll_next_2d_array(fqll_last,Ntot,Nstar,Nbar):
     #Ntot is a list of the amount of each type of ice
     fstar = Nstar/Nbar
-    return 1 + fstar*np.sin(2*np.pi*(Ntot-Nbar*fqll_last))
+    return 1 + fstar*math.sin(2*np.pi*(Ntot-Nbar*fqll_last))
 
 @njit("f8(f8,f8,f8,i4)") #Ntot is float in this case, Nstar and Nbar are floats, niter is an int literal
 def getNliq(Ntot,Nstar,Nbar,niter):#used to update fliq every iteration of odeint (to prevent drift /numerical instabilities)
@@ -222,7 +224,7 @@ def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs 
     # unpack current values of y
     Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(types.int32(2),types.int32(nx),types.int32(ny)))
     
-    # Deposition -- sigmastep going negative causing ablation at center of Ntot?? -no- but when delta*sigma0 is larger thasn sigmastep(near center), it creates ablation at center.
+    # Deposition
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
     #print('Fliq0: ', Fliq0)
     #print('Nbar - Nstar: ', Nbar - Nstar)
@@ -230,7 +232,7 @@ def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs 
     sigD = (sigmastep - delta * sigma0)/(1+delta*sigma0)
     #print('sigD: ',sigD)
     depsurf = deprate * sigD
-    print('depsurf quartersection: ',depsurf[:depsurf.shape[0]//2,:depsurf.shape[1]//2]) #TODO
+    #print('depsurf quartersection: ',depsurf[:depsurf.shape[0]//2,:depsurf.shape[1]//2]) #TODO
     dFliq0_dt = getdNliq_dNtot_2d_array(Ntot0,Nstar,Nbar,niter)*depsurf
 
     dNtot_dt = depsurf
@@ -270,9 +272,9 @@ def meshgrid(x, y):
             yy[i,j] = y[i] 
     return xx, yy
 
-@njit(float64[:,:](float64[:],float64[:],float64,float64))
-def getsigmastep_2d(xs,ys,center_reduction,sigmastepmax): 
-    
+#@njit(float64[:,:](float64[:],float64[:],float64,float64))
+def getsigmastep_2d(xs,ys,center_reduction,sigmastepmax) -> np.ndarray: 
+    c_r=center_reduction/100 #float64, convert percentage into decimal form
     # Getting the middle values of "x" and "y"
     xmax = np.max(xs)
     xmin = np.min(xs)
@@ -281,18 +283,21 @@ def getsigmastep_2d(xs,ys,center_reduction,sigmastepmax):
     ymax = np.max(ys)
     ymin = np.min(ys)
     ymid = (ymax-ymin)/2 +ymin
-    
+
     # Decide on an asymmetry factor
     asym = (xmax-xmin)/(ymax-ymin)
-    
     # Calculate 2d parabolic coefficients
-    C0 = sigmastepmax - center_reduction
-    Cx = center_reduction/(xmax-xmid)**2
-    Cy = center_reduction/(ymax-ymid)**2/asym
-    
+    C0 = sigmastepmax - c_r
+    Cx = c_r/(xmax-xmid)**2
+    Cy = c_r/(ymax-ymid)**2/asym
+
+
     # Make a grid and evaluate supersaturation on it
-    xgrid,ygrid = meshgrid(xs-xmid,ys-ymid)
+    #xgrid,ygrid = np.meshgrid(xs-xmid,ys-ymid)
+    ygrid,xgrid = np.meshgrid(ys-ymid,xs-xmid)
+    print(xgrid,ygrid)
     return C0 + xgrid**2*Cx + ygrid**2*Cy
+    #return np.reshape(C0 + xgrid**2*Cx + ygrid**2*Cy,(xs.size,ys.size))
 
 """  
 #old attempt of 2d supersaturation
