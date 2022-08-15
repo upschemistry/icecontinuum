@@ -213,18 +213,34 @@ class Simulation():
         self._results = {None:None} #solve_ivp (-like) dictionary of results
         pass
 
-    def run(self, print_progress=True, print_count_layers=False) -> None:
+    def run(self, print_progress=True, print_count_layers=False, halve_time_res=False) -> None:
+        """Runs the simulation and saves the results to the Simulation object. (self.results() to get the results)
+        
+        Args:
+        -----
+        print_progress: bool, optional
+            Whether to print progress to the console. Default is True.
+            
+        print_count_layers: bool, optional
+            Whether to print the number of layers to the console. Default is False.
+        
+        halve_time_res: bool, optional
+            Whether to halve the time resolution. Default is False.
+        """
         if self._results != {None:None}:
             #already been run: tell plot/animation to update when called again since it is has been run again
             self._rerun = True
-        """handles running the simulation"""
+
+        if halve_time_res:
+            #logic to only save every other time step
+            flop = False #starts as false to not save the second time step, since the first is always saved
+        
         #unpack parameters
         if self.dimension >= 0:
             Nbar = self.float_params['Nbar']
             Nstar = self.float_params['Nstar']
             sigma0 = self.float_params['sigma0']
             deprate = self.float_params['deprate']
-            
 
             niter = self.int_params['niter']
         if self.dimension == 0:
@@ -250,7 +266,6 @@ class Simulation():
             # Initialize with noise
             noise = np.random.normal(0,self.noise_std_dev,self.shape)
             Nice += noise
-        
         if self.dimension == 0:
             Fliq = Nbar#ds.getNliq(Nice,Nstar,Nbar,niter) fliq updates to this but starts as nbar
             #sigma = sigmastepmax
@@ -266,7 +281,6 @@ class Simulation():
             sigma = ds.getsigmastep_2d(self.x,self.y, self.center_reduction, self.sigmastepmax) # supersaturation
             model_args = (packed_float_params,packed_int_params,sigma) 
             nliq_func = ds.getNliq_2d_array # function to get to update fliq
-
         Ntot = Fliq + Nice
 
         if self.dimension == 0:
@@ -300,7 +314,12 @@ class Simulation():
             y = odeint(self.model, np.reshape(ylast,np.prod(np.shape(ylast))), self.tinterval, args=model_args, rtol=1e-12)
             
             # Update the state                  #NOTE: prod(shape(ylast)) is like (2*nx*ny)
-            ylast = np.reshape(y[1],(2,self.shape[0],self.shape[1]))
+            if self.dimension == 0:
+                ylast = y[1]
+            elif self.dimension == 1:
+                 ylast = np.reshape(y[1],(2,self.shape[0]))
+            elif self.dimension == 2:
+                ylast = np.reshape(y[1],(2,self.shape[0],self.shape[1]))
             tlast += self.deltaT
             counter += 1
             
@@ -319,9 +338,18 @@ class Simulation():
             elif self.dimension == 2:
                 Ntot0 = Ntot[0,0]
 
-            # Stuff into keeper arrays for making graphics
-            self._results['y'].append(ylast)
-            self._results['t'].append(tlast)
+            if halve_time_res:
+            #logic to only save every other time step (including first and last)
+                if flop:
+                    self._results['y'].append(ylast)
+                    self._results['t'].append(tlast)
+                    flop = False
+                else:
+                    flop = True #flop is a boolean that flips between true and false
+            else:    
+                # Stuff into keeper arrays
+                self._results['y'].append(ylast)
+                self._results['t'].append(tlast)
 
             # Update counters and see whether to break
             layer = Ntot0-Ntot0_start
@@ -363,7 +391,7 @@ class Simulation():
             self.run()
         return self._results
 
-    def getFliq(self) -> np.ndarray:
+    def getFliq(self):# -> np.ndarray:
         Fliq = []
         for step in range(len(self.results()['t'])):
             next_Fliq, next_Ntot = self.results()['y'][step]
@@ -407,8 +435,13 @@ class Simulation():
         if self._plot == None or self._rerun:
             #create plot of results
             step = int((len(self.results()['t'])-1)*completion)
-            Fliq,Ntot,Nice = self.getFliq(), self.getNtot(), self.getNice()
-
+            if liq:
+                Fliq = self.getFliq()
+            if tot:
+                Ntot = self.getNtot()
+            if ice: 
+                Nice = self.getNice()
+                        
             # Plot the results
             self._plot = plt.figure(figurename)
             if self.dimension == 0:
@@ -417,6 +450,7 @@ class Simulation():
                 
                 plt.grid('on')
                 if ice: 
+                    Nice = self.getNice()
                     plt.plot(self.t, Nice)
                     plt.ylabel(r'$N_{ice} $')
                 if tot:
@@ -443,14 +477,15 @@ class Simulation():
             elif self.dimension == 2:
                 #access coordinate arrays for plotting
                 xs, ys = np.meshgrid(self.x, self.y)
-                print(xs.shape, ys.shape, Nice.shape)
+                
+                #print(xs.shape, ys.shape, Nice.shape)
                 ax = plt.axes(projection='3d')
                 ax.set_xlabel(r'x ($\mu m$)')
                 ax.set_ylabel(r'y ($\mu m$)')
                 ax.set_zlabel('Layers of ice')
                 if surface:
                     if ice:
-                        ax.plot_surface(X=xs.T, Y=ys.T, Z=Nice[step], cmap='viridis')#, vmin=0, vmax=200)
+                        ax.plot_surface(X=xs, Y=ys, Z=Nice[step], cmap='viridis')#, vmin=0, vmax=200)
                     if tot:
                         ax.plot_surface(X=xs, Y=ys, Z=Ntot[step], cmap='YlGnBu_r')#, vmin=0, vmax=200)
                     if liq:
@@ -531,7 +566,7 @@ class Simulation():
                 #access coordinate arrays for plotting
                 xs, ys = np.meshgrid(self.x, self.y)
                 #3d animation of the results
-                print(xs.shape, ys.shape, Nice.shape)
+                #print(xs.shape, ys.shape, Nice.shape)
                 ax = plt.axes(projection='3d')
                 #labels
                 
@@ -615,10 +650,10 @@ class Simulation():
         try:
             if filetype == 'mp4':
                 Writer = animation.writers['ffmpeg']
-                writer = Writer(fps=15, metadata=dict(artist='Me'), bitrate=1800)
+                writer = Writer(fps=15, bitrate=1800)
             elif filetype == 'gif':
                 Writer = animation.writers['imagemagick']
-                writer = Writer(fps=15, metadata=dict(artist='Me'), bitrate=1800)
+                writer = Writer(fps=15, bitrate=1800)
             else:
                 print('filetype not supported')
                 return
