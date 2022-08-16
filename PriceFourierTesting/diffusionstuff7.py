@@ -132,7 +132,7 @@ def diffuse_1d(Fliq0,DoverdeltaX2):
         dy[l-1] = DoverdeltaX2*(Fliq0[0]-2*Fliq0[l-1]+Fliq0[l-2])
     return dy
 
-@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])",parallel=prll_bool)#slower with paralellization right now
+@njit("f8[:](f8[:],f8,f8[:],i8[:],f8[:])",parallel=prll_bool)#slower with paralellization right now
 def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
     """ odeint function for the one-dimensional ice model """
      # unpack parameters
@@ -171,6 +171,8 @@ def f1d_diff_only(y, t, float_params, int_params, sigmastep): #sigmastep is an a
     # unpack current values of y
     Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(types.int32(2),types.int32(nx))) #old
     #Fliq0 = np.reshape(y,nx)
+    
+    # dNT/dt = diffusion + sigma*dep()
     
     # Deposition
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
