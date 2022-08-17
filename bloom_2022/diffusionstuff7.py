@@ -6,8 +6,8 @@ Created on Tue Jul 14 15:01:47 2015
 """
 
 import numpy as np
-import math
-from numba import njit, float64, types,guvectorize
+#import math
+from numba import njit, float64, types#,guvectorize
 
 prll_1d = False # 1d faster without parallelization
 prll_2d = True  # 2d faster with parallelization
@@ -216,8 +216,8 @@ def diffuse_2d(t,y,D,shape):
     """
     Fliq0 = y
     m,n = shape
-    #Fliq0 = np.reshape(np.ascontiguousarray(Fliq0),(m,n)) #reshaping required for odeint/solve_ivp
-    Fliq0 = np.reshape(Fliq0,(m,n)) #reshaping required for odeint/solve_ivp
+    Fliq0 = np.reshape(np.ascontiguousarray(Fliq0),(m,n)) #reshaping required for odeint/solve_ivp
+    #Fliq0 = np.reshape(Fliq0,(m,n)) #reshaping required for odeint/solve_ivp
     dy = np.zeros((m,n)) 
    
     for i in range(0,m): #go from left column to right
@@ -240,7 +240,6 @@ def diffuse_2d(t,y,D,shape):
     #dy = diffuse_vector_helper(Fliq0,dy,D)
             
     return np.reshape(dy,(m*n))
-
 
 @njit("f8[:](f8[:],f8,f8[:],i8[:],f8[:,:])",parallel=prll_2d)
 def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs to become 2D -- use vaporfield 3d data
@@ -292,16 +291,17 @@ def getsigmastep(x,xmax,center_reduction,sigmastepmax):#,method='parabolic'):
     #    print('bad method')
     return fsig*sigmastepmax
 
-@njit(types.containers.UniTuple(float64[:,:],2)(float64[:],float64[:]))
-def meshgrid(x, y):
-    """ numba-compatible version of np.meshgrid """
-    xx = np.empty(shape=(x.size, y.size), dtype=x.dtype)
-    yy = np.empty(shape=(x.size, y.size), dtype=y.dtype)
-    for i in range(y.size):
-        for j in range(x.size):
-            xx[i,j] = x[j] 
-            yy[i,j] = y[i] 
-    return xx, yy
+#NOTE: unused now
+# @njit(types.containers.UniTuple(float64[:,:],2)(float64[:],float64[:]))
+# def meshgrid(x, y):
+#     """ numba-compatible version of np.meshgrid """
+#     xx = np.empty(shape=(x.size, y.size), dtype=x.dtype)
+#     yy = np.empty(shape=(x.size, y.size), dtype=y.dtype)
+#     for i in range(y.size):
+#         for j in range(x.size):
+#             xx[i,j] = x[j] 
+#             yy[i,j] = y[i] 
+#     return xx, yy
 
 #@njit(float64[:,:](float64[:],float64[:],float64,float64))
 def getsigmastep_2d(xs,ys,center_reduction,sigmastepmax) -> np.ndarray: 

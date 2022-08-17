@@ -10,6 +10,7 @@ from numba.types import int64,int32
 
 #for animations
 import matplotlib.animation as animation
+from matplotlib.animation import FuncAnimation, PillowWriter
 
 #for saving simulations
 import pickle
@@ -394,7 +395,8 @@ class Simulation():
     def getFliq(self):# -> np.ndarray:
         Fliq = []
         for step in range(len(self.results()['t'])):
-            next_Fliq, next_Ntot = self.results()['y'][step]
+            #next_Fliq, next_Ntot = self.results()['y'][step]
+            next_Fliq = self.results()['y'][step][0]
             #normalize results
             Fliq.append(next_Fliq)
         return np.array(Fliq)#, np.array(Ntot)
@@ -403,7 +405,8 @@ class Simulation():
     def getNtot(self) -> np.ndarray:
         Ntot = []
         for step in range(len(self.results()['t'])):
-            next_Fliq, next_Ntot = self.results()['y'][step]
+            #next_Fliq, next_Ntot = self.results()['y'][step]
+            next_Ntot = self.results()['y'][step][1]
             #normalize results
             Ntot.append(next_Ntot)
         return np.array(Ntot)
@@ -505,7 +508,7 @@ class Simulation():
         #return self._plot 
         pass
     
-    def animate(self, proportionalSpeed=True, ice=True, tot=False, liq=False, surface=True, crossSection=False):
+    def animate(self, proportionalSpeed=True, ice=True, tot=False, liq=False, surface=True, crossSection=False, ret=False):
         """ Animate the results of the simulation.
 
         Args:
@@ -527,13 +530,18 @@ class Simulation():
         
         crossSection: bool
             Plot a cross section (of the 2d model)?
+        
+        ret: bool
+            Return the animation, or just pass.
         """
         if self._animation == None:
             #create animation of results
             num_steps = len(self.results()['t'])
             #shape of results is (num_steps, 2, nx, ny)
             Nice = self.getNice()
-
+            if tot:
+                Ntot = self.getNtot()
+            
             #shape of fliq, ntot and nice should be (num_steps, nx, ny)
             fig = plt.figure()
             #global update_fig#neccesary for saving the animation- but we cant save the animation object anyway so unnecessary
@@ -564,12 +572,13 @@ class Simulation():
                 plt.legend()
             elif self.dimension == 2: 
                 #access coordinate arrays for plotting
-                xs, ys = np.meshgrid(self.x, self.y)
+                #np.meshgrid returns y before x
+                ys, xs = np.meshgrid(self.y, self.x)
+
                 #3d animation of the results
                 #print(xs.shape, ys.shape, Nice.shape)
                 ax = plt.axes(projection='3d')
                 #labels
-                
                 def update_fig(num):
                     ax.clear() # remove last iteration of plot 
 
@@ -581,13 +590,12 @@ class Simulation():
                     ax.set_zlim3d(np.min(Nice)-0.5, np.max(Nice)+1.5)
                     ax.set_ylim(0, max(self.y))
                     ax.set_xlim(0, max(self.x))
-                    ax.set_aspect('equal')
+                    #ax.set_aspect('equal') doesnt work for 3d, breaking animation for some reason
 
                     if surface:
                         if ice:
-                            ax.plot_surface(X=xs.T, Y=ys.T, Z=Nice[num], cmap='viridis')#, vmin=0, vmax=200)#plot the surface of the ice 
+                            ax.plot_surface(X=xs, Y=ys, Z=Nice[num], cmap='viridis')#, vmin=0, vmax=200)#plot the surface of the ice 
                         if tot:
-                            Ntot = self.getNtot()
                             ax.plot_surface(X=xs, Y=ys, Z=Ntot[num], cmap='YlGnBu_r')#, vmin=0, vmax=200)#plot the surface of the QLL
                         #cross section
                         # xmid = round(np.shape(Nice)[0]/2)
@@ -601,7 +609,6 @@ class Simulation():
                         if ice:
                             ax.wireframe(X=xs, Y=ys, Z=Nice[num], cmap='viridis')#, vmin=0, vmax=200) #plot the surface of the ice 
                         if tot:
-                            Ntot = self.getNtot()
                             ax.wireframe(X=xs, Y=ys, Z=Ntot[num], cmap='YlGnBu_r')#, vmin=0, vmax=200)#plot the surface of the QLL
                     pass
             
@@ -611,10 +618,12 @@ class Simulation():
             else:
                 intrvl = 50
             #self._animation = animation.FuncAnimation(self._anim_fig, update_fig, num_steps, interval=intrvl, blit=False, cache_frame_data=False, repeat = True)
-            anim = animation.FuncAnimation(fig, update_fig, num_steps, interval=intrvl, blit=False, cache_frame_data=False, repeat = True) #pickle does not like saving animation, also it is a a lot of data to save
+            anim = FuncAnimation(fig, update_fig, num_steps, interval=intrvl, blit=False, cache_frame_data=False, repeat = True) #pickle does not like saving animation, also it is a a lot of data to save
         plt.show()
-        return anim#self._animation
-        pass
+        if ret:
+            return anim#self._animation
+        else:
+            pass
 
     def save(self, id = []) -> None:
         """ Saves Simulation object to a pickle file
@@ -652,8 +661,7 @@ class Simulation():
                 Writer = animation.writers['ffmpeg']
                 writer = Writer(fps=15, bitrate=1800)
             elif filetype == 'gif':
-                Writer = animation.writers['imagemagick']
-                writer = Writer(fps=15, bitrate=1800)
+                writer = PillowWriter(fps=60,bitrate=1800)#animation.writers['imagemagick']
             else:
                 print('filetype not supported')
                 return
@@ -663,7 +671,7 @@ class Simulation():
             return
 
         try:
-            self.animate().save(filename+'.'+filetype, writer=writer)
+            self.animate(ret=True).save(filename+'.'+filetype, writer=writer)
         except Exception as e:
             print(e)
             print('Error saving animation')
