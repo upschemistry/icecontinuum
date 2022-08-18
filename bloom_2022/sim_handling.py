@@ -5,7 +5,7 @@ import time
 import diffusionstuff7 as ds
 from copy import copy as dup
 from scipy.integrate import odeint
-#from scipy.integrate import solve_ivp
+from scipy.integrate import solve_ivp
 from numba.types import int64,int32
 
 #for animations
@@ -74,8 +74,8 @@ class Simulation():
         """
         # model integrator arguments
         self.model = model #integratable differential equation model 
-        self.method = method #default to emulate odeint TODO unused since designed for solve_ivp
-        self.atol = atol #default absolute tolerance TODO unused
+        self.method = method #default to emulate odeint for solve_ivp
+        self.atol = atol #default absolute tolerance 
         self.rtol = rtol #default relative tolerance
         self.shape = shape #shape of initial condition
 
@@ -312,15 +312,20 @@ class Simulation():
         # Call the ODE solver
         while True:
             # Integrate up to next time step
-            y = odeint(self.model, np.reshape(ylast,np.prod(np.shape(ylast))), self.tinterval, args=model_args, rtol=1e-12)
+            if self.method == 'odeint':
+                y = odeint(self.model, np.reshape(ylast,np.prod(np.shape(ylast))), self.tinterval, args=model_args, rtol=self.rtol, atol=self.atol)
+            else:
+                solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method=self.method, args=model_args, t_eval=self.tinterval)#rtol=1e-12, atol=1e-12,
+                #get new y values out of solve_ivp_results dictionary
+                y = solve_ivp_result.y[:, len(solve_ivp_result.t)-1]#y[:,-1] : get last timestep that solve_ivp returns
             
-            # Update the state                  #NOTE: prod(shape(ylast)) is like (2*nx*ny)
+            # Update the state                 
             if self.dimension == 0:
                 ylast = y[1]
             elif self.dimension == 1:
-                 ylast = np.reshape(y[1],(2,self.shape[0]))
+                 ylast = np.reshape(y[1],(2,self.shape[0])) #used to by ylast = y[1] for odeint
             elif self.dimension == 2:
-                ylast = np.reshape(y[1],(2,self.shape[0],self.shape[1]))
+                ylast = np.reshape(y,(2,self.shape[0],self.shape[1])) 
             tlast += self.deltaT
             counter += 1
             
@@ -363,6 +368,12 @@ class Simulation():
                         print('counter, layer, depth_of_facet_in_layers, delta_depth')
                     print(counter-1, lastlayer, maxpoint-minpoint, maxpoint-minpoint-lastdiff)
                 lastdiff = maxpoint-minpoint
+
+                #break if too many steps for discretization
+                if lastdiff > max(self.shape)//10:
+                    print('Warning: too many steps for discretization')
+                    break
+                
                 lastlayer += 1
                 
             # Test whether we're finished
@@ -508,7 +519,8 @@ class Simulation():
         #return self._plot 
         pass
     
-    def animate(self, proportionalSpeed=True, ice=True, tot=False, liq=False, surface=True, crossSection=False, ret=False):
+    def animate(self, proportionalSpeed=True, ice=True, tot=False, liq=False, surface=True,
+                 crossSection=False, ret=False, speed=1, focus_on_growth=True):
         """ Animate the results of the simulation.
 
         Args:
@@ -578,20 +590,24 @@ class Simulation():
                 #3d animation of the results
                 #print(xs.shape, ys.shape, Nice.shape)
                 ax = plt.axes(projection='3d')
+
+                #set up axis labels and limits
+                ax.set_xlabel(r'$x (\mu m$)')#,fontsize=fontsize)
+                ax.set_ylabel(r'$y (\mu m$)')#,fontsize=fontsize)
+                ax.set_zlabel(r'$ice \ layers$')#,fontsize=fontsize)
+                ax.set_xlim(0, max(self.x))
+                ax.set_ylim(0, max(self.y))
+                if not focus_on_growth:
+                    ax.set_zlim3d(np.min(Nice)-0.5, np.max(Nice)+1.5) # show full range of ice layers grown (0 to layermax)
+
                 #labels
                 def update_fig(num):
                     ax.clear() # remove last iteration of plot 
-
-                    ax.set_xlabel(r'$x (\mu m$)')#,fontsize=fontsize)
-                    ax.set_ylabel(r'$y (\mu m$)')#,fontsize=fontsize)
-                    ax.set_zlabel(r'$ice \ layers$')#,fontsize=fontsize)
                     #limits
-                    #ax.set_zlim3d(-self.layermax, self.layermax)
-                    ax.set_zlim3d(np.min(Nice)-0.5, np.max(Nice)+1.5)
-                    ax.set_ylim(0, max(self.y))
-                    ax.set_xlim(0, max(self.x))
+                    if focus_on_growth: #stay zoomed on new growth
+                        ax.set_zlim3d(np.min(Nice[num]-0.5), np.max(Nice[num]+1.5)) 
+                    
                     #ax.set_aspect('equal') doesnt work for 3d, breaking animation for some reason
-
                     if surface:
                         if ice:
                             ax.plot_surface(X=xs, Y=ys, Z=Nice[num], cmap='viridis')#, vmin=0, vmax=200)#plot the surface of the ice 
@@ -617,6 +633,11 @@ class Simulation():
                 intrvl = int(50*30/self.layermax)+1#targeting speeds similar to 50ms interval at 30 layers, if more layers it will speed it up to keep the animation at the same visual speed
             else:
                 intrvl = 50
+
+            if speed != 1: # increase animation replay speed by "speed" factor
+                intrvl = intrvl // speed
+            
+
             #self._animation = animation.FuncAnimation(self._anim_fig, update_fig, num_steps, interval=intrvl, blit=False, cache_frame_data=False, repeat = True)
             anim = FuncAnimation(fig, update_fig, num_steps, interval=intrvl, blit=False, cache_frame_data=False, repeat = True) #pickle does not like saving animation, also it is a a lot of data to save
         plt.show()

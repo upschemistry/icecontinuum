@@ -164,34 +164,9 @@ def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
     derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx)
     return derivs
 
-
-#vectorizing diffusion not working yet
-# @guvectorize(['float64[:,:](float64[:,:],float64[:,:],float64)'],
-#                       '(x, y),(x, y),()->(x, y)', target='cuda')
-# def diffuse_vector_helper(y,dy,D):
-#     for i in range(0,y.shape[0]): #go from left column to right
-#         for j in range(0,y.shape[1]): #go from top row to bottom
-
-#             ip1=i+1
-#             jp1=j+1
-#             # Boundary Conditions (periodic at ends) #TODO: test this
-           
-#             if i == y.shape[0]-1: #take care of right column condition wrapping to left edge
-#                 ip1 = 0
-
-#             if j == y.shape[1]-1: #take care of bottom edge wrapping to top edge
-#                 jp1 = 0
-
-#             ux = (y[ip1,j] - 2*y[i,j] + y[i-1,j])
-#             uy = (y[i,jp1] - 2*y[i,j] + y[i,j-1])
-
-#             dy[i,j] = D*(ux+uy)
-#     return dy
-
-
 @njit(float64[:](float64,float64[:],float64,types.int64[:]), parallel=prll_2d)
 def diffuse_2d(t,y,D,shape):
-    """ Applies numerical solution to find diffusive effects at each time step. Fliq0 is flattened 2d array of shape shape.
+    """ Applies numerical solution to liquid to find diffusive effects. Fliq0 is flattened 2d array of shape shape.
     
     Parameters
     ----------
@@ -222,27 +197,24 @@ def diffuse_2d(t,y,D,shape):
    
     for i in range(0,m): #go from left column to right
         for j in range(0,n): #go from top row to bottom
-
-            ip1=i+1
+            ip1=i+1 #i plus one
             jp1=j+1
-            # Boundary Conditions (periodic at ends) #TODO: test this
-           
+            # Boundary Conditions (periodic at ends)
             if i == m-1: #take care of right column condition wrapping to left edge
                 ip1 = 0
-
             if j == n-1: #take care of bottom edge wrapping to top edge
                 jp1 = 0
 
             ux = (Fliq0[ip1,j] - 2*Fliq0[i,j] + Fliq0[i-1,j])
             uy = (Fliq0[i,jp1] - 2*Fliq0[i,j] + Fliq0[i,j-1])
 
-            dy[i,j] = D*(ux+uy)
+            dy[i,j] = D*(ux)#+uy) #TODO: this removes diffusion in the y direction temporarily
     #dy = diffuse_vector_helper(Fliq0,dy,D)
             
     return np.reshape(dy,(m*n))
 
-@njit("f8[:](f8[:],f8,f8[:],i8[:],f8[:,:])",parallel=prll_2d)
-def f2d(y, t, float_params, int_params, sigmastep):#NOTE, TODO: sigmastep needs to become 2D -- use vaporfield 3d data
+@njit("f8[:](f8,f8[:],f8[:],i8[:],f8[:,:])",parallel=prll_2d) #NOTE: t and y swapped for solve_ivp compatability
+def f2d(t, y, float_params, int_params, sigmastep):
     """ 2D version of f1d """
 
     # diffusion = True
@@ -327,6 +299,9 @@ def getsigmastep_2d(xs,ys,center_reduction,sigmastepmax) -> np.ndarray:
     #xgrid,ygrid = np.meshgrid(xs-xmid,ys-ymid)
     ygrid,xgrid = np.meshgrid(ys-ymid,xs-xmid)
     #print(xgrid,ygrid)
+
+    Cy = 0.0 #TODO: temporary, see effect on sigmastep
+
     return C0 + xgrid**2*Cx + ygrid**2*Cy
     #return np.reshape(C0 + xgrid**2*Cx + ygrid**2*Cy,(xs.size,ys.size))
 
