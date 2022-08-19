@@ -313,17 +313,23 @@ class Simulation():
         while True:
             # Integrate up to next time step
             if self.method == 'odeint':
-                y = odeint(self.model, np.reshape(ylast,np.prod(np.shape(ylast))), self.tinterval, args=model_args, rtol=self.rtol, atol=self.atol)
+                solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method='RK45', args=model_args, rtol=self.rtol, atol=self.atol)#, t_eval=self.tinterval)
+                # print('ylast: ', ylast)
+                # print("shape of ylast: ", np.shape(ylast))
+                # print("np.prod(np.shape(ylast)): ", np.prod(np.shape(ylast)))
+                # y = odeint(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), args=model_args, rtol=self.rtol, atol=self.atol, tfirst=True)
+                y = solve_ivp_result.y[:, len(solve_ivp_result.t)-1]#y[:,-1] : get last timestep that solve_ivp returns
+                #y = y[1]
             else:
-                solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method=self.method, args=model_args, t_eval=self.tinterval)#rtol=1e-12, atol=1e-12,
+                solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method=self.method, args=model_args, t_eval=self.tinterval, rtol=self.rtol, atol=self.atol)
                 #get new y values out of solve_ivp_results dictionary
                 y = solve_ivp_result.y[:, len(solve_ivp_result.t)-1]#y[:,-1] : get last timestep that solve_ivp returns
             
             # Update the state                 
             if self.dimension == 0:
-                ylast = y[1]
+                ylast = y
             elif self.dimension == 1:
-                 ylast = np.reshape(y[1],(2,self.shape[0])) #used to by ylast = y[1] for odeint
+                 ylast = np.reshape(y,(2,self.shape[0])) #used to by ylast = y[1] for odeint
             elif self.dimension == 2:
                 ylast = np.reshape(y,(2,self.shape[0],self.shape[1])) 
             tlast += self.deltaT

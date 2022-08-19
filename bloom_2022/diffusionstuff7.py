@@ -136,8 +136,8 @@ def diffuse_1d(Fliq0,DoverdeltaX2):
         dy[l-1] = DoverdeltaX2*(Fliq0[0]-2*Fliq0[l-1]+Fliq0[l-2])
     return dy
 
-@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])",parallel=prll_1d)#slower with paralellization right now
-def f1d(y, t, float_params, int_params, sigmastep): #sigmastep is an array
+@njit("f8[:](f8,f8[:],f8[:],i4[:],f8[:])",parallel=prll_1d)#slower with paralellization right now
+def f1d(t, y, float_params, int_params, sigmastep): #sigmastep is an array
     """ odeint function for the one-dimensional ice model """
      # unpack parameters
     Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
@@ -208,7 +208,7 @@ def diffuse_2d(t,y,D,shape):
             ux = (Fliq0[ip1,j] - 2*Fliq0[i,j] + Fliq0[i-1,j])
             uy = (Fliq0[i,jp1] - 2*Fliq0[i,j] + Fliq0[i,j-1])
 
-            dy[i,j] = D*(ux)#+uy) #TODO: this removes diffusion in the y direction temporarily
+            dy[i,j] = D*(ux+uy)
     #dy = diffuse_vector_helper(Fliq0,dy,D)
             
     return np.reshape(dy,(m*n))
@@ -300,7 +300,7 @@ def getsigmastep_2d(xs,ys,center_reduction,sigmastepmax) -> np.ndarray:
     ygrid,xgrid = np.meshgrid(ys-ymid,xs-xmid)
     #print(xgrid,ygrid)
 
-    Cy = 0.0 #TODO: temporary, see effect on sigmastep
+    #Cy = 0.0 #TODO: temporary, see effect on sigmastep
 
     return C0 + xgrid**2*Cx + ygrid**2*Cy
     #return np.reshape(C0 + xgrid**2*Cx + ygrid**2*Cy,(xs.size,ys.size))
