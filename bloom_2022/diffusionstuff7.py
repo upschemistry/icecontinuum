@@ -294,6 +294,10 @@ def getsigmastep_2d(xs,ys,center_reduction,sigmastepmax) -> np.ndarray:
     Cx = c_r/(xmax-xmid)**2
     Cy = c_r/(ymax-ymid)**2/asym
 
+    if sigmastepmax < 0: # ablation case
+        C0 = sigmastepmax + c_r
+        Cx *= -1
+        Cy *= -1      
 
     # Make a grid and evaluate supersaturation on it
     #xgrid,ygrid = np.meshgrid(xs-xmid,ys-ymid)

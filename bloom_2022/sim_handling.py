@@ -496,13 +496,10 @@ class Simulation():
                 plt.ylabel('Layers of ice')
             elif self.dimension == 2:
                 #access coordinate arrays for plotting
-                xs, ys = np.meshgrid(self.x, self.y)
+                ys, xs = np.meshgrid(self.y, self.x)
                 
                 #print(xs.shape, ys.shape, Nice.shape)
                 ax = plt.axes(projection='3d')
-                ax.set_xlabel(r'x ($\mu m$)')
-                ax.set_ylabel(r'y ($\mu m$)')
-                ax.set_zlabel('Layers of ice')
                 if surface:
                     if ice:
                         ax.plot_surface(X=xs, Y=ys, Z=Nice[step], cmap='viridis')#, vmin=0, vmax=200)
@@ -518,6 +515,10 @@ class Simulation():
                         ax.contour(xs,ys, Ntot[step], extent=(0, 2, 0, 2), cmap='YlGnBu_r', vmin=0, vmax=200, zorder=1, levels=levels)
                     if liq:
                         ax.contour(xs,ys, Fliq[step], extent=(0, 2, 0, 2), cmap='YlGnBu_r', vmin=0, vmax=200, zorder=1, levels=levels)
+                
+                ax.set_xlabel(r'x ($\mu m$)')
+                ax.set_ylabel(r'y ($\mu m$)')
+                ax.set_zlabel('Layers of ice')
             else:
                 print('Error: dimension not supported')
                 return None
@@ -638,7 +639,7 @@ class Simulation():
             if proportionalSpeed:#TODO: scale interval to make length of gif/mp4 be 10 seconds, scaling speed of animation by factor proportional to length of simulation
                 intrvl = int(50*30/self.layermax)+1#targeting speeds similar to 50ms interval at 30 layers, if more layers it will speed it up to keep the animation at the same visual speed
             else:
-                intrvl = 50
+                intrvl = 5 #5ms interval
 
             if speed != 1: # increase animation replay speed by "speed" factor
                 intrvl = intrvl // speed
