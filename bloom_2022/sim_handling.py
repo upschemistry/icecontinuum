@@ -1,4 +1,5 @@
 from ctypes import py_object
+from math import floor
 import numpy as np
 from matplotlib import pyplot as plt
 import time
@@ -57,8 +58,9 @@ class Simulation():
     
     @author: Max Bloom 
     """
-
-    def __init__(self, model=None, shape=(None,), method= "LSODA", atol= 1e-6, rtol= 1e-6, noisy=False, noise_stddev=0.01, layermax=0):
+#TODO implement starting from a saved run
+#TODO implement starting from an arbtitrary initial condition ( to test low freq. spatial noise)
+    def __init__(self, model=None, shape=(None,), method= "LSODA", atol= 1e-6, rtol= 1e-6, noisy=False, noise_stddev=0.01, layermax=0, nonstd_init=False, starting_ice=None,startingNtot =None):
         """Initialize the Simulation
         Parameters
         ----------
@@ -385,7 +387,11 @@ class Simulation():
             # Test whether we're finished
             if self.uselayers:
                 if print_progress:
-                    print("appx progress:" , round((layer/(self.layermax-1))*100, 2),"%",end="\r")
+                    if self.sigmastepmax <0:
+                        prog = round((-1*layer/(self.layermax-1))*100, 2)
+                    else:
+                        prog = round((layer/(self.layermax-1))*100, 2)
+                    print("appx progress:" , prog,"%",end="\r")
                 if self.sigmastepmax > 0:
                     if layer > self.layermax-1:
                         print('breaking because reached max number of layers grown')
@@ -409,29 +415,37 @@ class Simulation():
             self.run()
         return self._results
 
-    def getFliq(self):# -> np.ndarray:
-        Fliq = []
-        for step in range(len(self.results()['t'])):
-            #next_Fliq, next_Ntot = self.results()['y'][step]
-            next_Fliq = self.results()['y'][step][0]
-            #normalize results
-            Fliq.append(next_Fliq)
-        return np.array(Fliq)#, np.array(Ntot)
-        #return np.array([i for i,_ in self.results()['y'][:]])
+    def getFliq(self, step=None):# -> np.ndarray:
+        if step == None:
+            Fliq = []
+            for i in range(len(self.results()['t'])):
+                #next_Fliq, next_Ntot = self.results()['y'][i]
+                next_Fliq = self.results()['y'][i][0]
+                #normalize results
+                Fliq.append(next_Fliq)
+            return np.array(Fliq)
+        else:
+            return self.results()['y'][step][0]
         
-    def getNtot(self) -> np.ndarray:
-        Ntot = []
-        for step in range(len(self.results()['t'])):
-            #next_Fliq, next_Ntot = self.results()['y'][step]
-            next_Ntot = self.results()['y'][step][1]
-            #normalize results
-            Ntot.append(next_Ntot)
-        return np.array(Ntot)
+    def getNtot(self, step=None) -> np.ndarray:
+        if step == None:
+            Ntot = []
+            for step in range(len(self.results()['t'])):
+                #next_Fliq, next_Ntot = self.results()['y'][step]
+                next_Ntot = self.results()['y'][step][1]
+                #normalize results
+                Ntot.append(next_Ntot)
+            return np.array(Ntot)
+        else:   
+            return self.results()['y'][step][1]
 
-    def getNice(self) -> np.ndarray:
-        return self.getNtot() - self.getFliq()
+    def getNice(self, step=None) -> np.ndarray:
+        if step == None:
+            return self.getNtot() - self.getFliq()
+        else:
+            return self.getNtot(step) - self.getFliq(step)
 
-    def plot(self, completion=1, figurename='', ice=True,tot=False,liq=False, surface=True, contour=False):# -> matplotlib_figure: ## , method = 'surface'): #TODO: test plotting
+    def plot(self, completion=1, figurename='', ice=True, tot=False, liq=False, surface=True, contour=False):# -> matplotlib_figure: ## , method = 'surface'): #TODO: test plotting
         """ Plot the results of the simulation.
         
         Args:
@@ -452,76 +466,71 @@ class Simulation():
         
         """
         """ plot results of simulation, returns matplotlib figure """
-        if self._plot == None or self._rerun:
-            #create plot of results
-            step = int((len(self.results()['t'])-1)*completion)
-            if liq:
-                Fliq = self.getFliq()
-            if tot:
-                Ntot = self.getNtot()
+        #if self._plot == None or self._rerun:
+        #create plot of results
+        step = floor((len(self.results()['t'])-1)*completion)
+                    
+        # Plot the results
+        self._plot = plt.figure(figurename)
+        if self.dimension == 0:
+            # Plot results
+            plt.xlabel(r't ($\mu s$)')
+            plt.grid('on')
             if ice: 
                 Nice = self.getNice()
-                        
-            # Plot the results
-            self._plot = plt.figure(figurename)
-            if self.dimension == 0:
-                # Plot results
-                plt.xlabel(r't ($\mu s$)')
-                
-                plt.grid('on')
-                if ice: 
-                    Nice = self.getNice()
-                    plt.plot(self.t, Nice)
-                    plt.ylabel(r'$N_{ice} $')
-                if tot:
-                    plt.plot(self.t, Ntot)
-                    plt.ylabel(r'$N_{ice} + $N_{QLL} $')
-                if liq:
-                    plt.plot(self.t, Fliq)
-                    plt.ylabel(r'$N_{QLL} $')
-                plt.legend()
-                plt.xlabel('Time')
-                plt.ylabel('Layers of ice')
-            elif self.dimension == 1:
-                ax = plt.axis()
+                plt.plot(self.t, Nice)
+                plt.ylabel(r'$N_{ice} $')
+            if tot:
+                Ntot = self.getNtot()
+                plt.plot(self.t, Ntot)
+                plt.ylabel(r'$N_{ice} + $N_{QLL} $')
+            if liq:
+                Fliq = self.getFliq()
+                plt.plot(self.t, Fliq)
+                plt.ylabel(r'$N_{QLL} $')
+            plt.legend()
+            plt.xlabel('Time')
+            plt.ylabel('Layers of ice')
+        elif self.dimension == 1:
+            ax = plt.axis()
+            if ice:
+                plt.plot(self.x, self.getNice(step), 'k', label='ice')
+            if tot:
+                plt.plot(self.x, self.getNtot(step), 'b', label='ice+QLL')
+                #plt.plot(x-xmid, Fliq+Nice-minpoint, 'b', label='ice+liquid', lw=linewidth)
+            if liq:
+                plt.plot(self.x, self.getFliq(step), 'g', label='QLL')
+            plt.legend()
+            plt.xlabel(r'x ($\mu m$)')
+            plt.ylabel('Layers of ice')
+        elif self.dimension == 2:
+            #access coordinate arrays for plotting
+            ys, xs = np.meshgrid(self.y, self.x)
+            
+            #print(xs.shape, ys.shape, Nice.shape)
+            ax = plt.axes(projection='3d')
+            if surface:
                 if ice:
-                    plt.plot(self.x, Nice[step], 'k', label='ice')
+                    ax.plot_surface(X=xs, Y=ys, Z=self.getNice(step), cmap='viridis')#, vmin=0, vmax=200)
                 if tot:
-                    plt.plot(self.x, Ntot[step], 'b', label='ice+QLL')
-                    #plt.plot(x-xmid, Fliq+Nice-minpoint, 'b', label='ice+liquid', lw=linewidth)
+                    ax.plot_surface(X=xs, Y=ys, Z=self.getNtot(step), cmap='YlGnBu_r')#, vmin=0, vmax=200)
                 if liq:
-                    plt.plot(self.x, Fliq[step], 'g', label='QLL')
-                plt.legend()
-                plt.xlabel(r'x ($\mu m$)')
-                plt.ylabel('Layers of ice')
-            elif self.dimension == 2:
-                #access coordinate arrays for plotting
-                ys, xs = np.meshgrid(self.y, self.x)
-                
-                #print(xs.shape, ys.shape, Nice.shape)
-                ax = plt.axes(projection='3d')
-                if surface:
-                    if ice:
-                        ax.plot_surface(X=xs, Y=ys, Z=Nice[step], cmap='viridis')#, vmin=0, vmax=200)
-                    if tot:
-                        ax.plot_surface(X=xs, Y=ys, Z=Ntot[step], cmap='YlGnBu_r')#, vmin=0, vmax=200)
-                    if liq:
-                        ax.plot_surface(X=xs, Y=ys, Z=Fliq[step], cmap='YlGnBu_r')
-                elif contour: #elif method == 'contour':
-                    levels = np.arange(-6,12,0.25)
-                    if ice:
-                        ax.contour(xs,ys, Nice[step], extent=(0, 2, 0, 2), cmap='YlGnBu_r', vmin=0, vmax=200, zorder=1, levels=levels)
-                    if tot:
-                        ax.contour(xs,ys, Ntot[step], extent=(0, 2, 0, 2), cmap='YlGnBu_r', vmin=0, vmax=200, zorder=1, levels=levels)
-                    if liq:
-                        ax.contour(xs,ys, Fliq[step], extent=(0, 2, 0, 2), cmap='YlGnBu_r', vmin=0, vmax=200, zorder=1, levels=levels)
-                
-                ax.set_xlabel(r'x ($\mu m$)')
-                ax.set_ylabel(r'y ($\mu m$)')
-                ax.set_zlabel('Layers of ice')
-            else:
-                print('Error: dimension not supported')
-                return None
+                    ax.plot_surface(X=xs, Y=ys, Z=self.getFliq(step), cmap='YlGnBu_r')
+            elif contour: #elif method == 'contour':
+                levels = np.arange(-6,12,0.25)
+                if ice:
+                    ax.contour(xs,ys, self.getNice(step), extent=(0, 2, 0, 2), cmap='YlGnBu_r', vmin=0, vmax=200, zorder=1, levels=levels)
+                if tot:
+                    ax.contour(xs,ys, self.getNtot(step), extent=(0, 2, 0, 2), cmap='YlGnBu_r', vmin=0, vmax=200, zorder=1, levels=levels)
+                if liq:
+                    ax.contour(xs,ys, self.getFliq(step), extent=(0, 2, 0, 2), cmap='YlGnBu_r', vmin=0, vmax=200, zorder=1, levels=levels)
+            
+            ax.set_xlabel(r'x ($\mu m$)')
+            ax.set_ylabel(r'y ($\mu m$)')
+            ax.set_zlabel('Layers of ice')
+            # else:
+            #     print('Error: dimension not supported')
+            #     return None
         plt.show()
         #return self._plot 
         pass
