@@ -1,15 +1,17 @@
 from ctypes import py_object
+from math import floor
 import numpy as np
 from matplotlib import pyplot as plt
 import time
 import diffusionstuff7 as ds
 from copy import copy as dup
 from scipy.integrate import odeint
-#from scipy.integrate import solve_ivp
+from scipy.integrate import solve_ivp
 from numba.types import int64,int32
 
 #for animations
 import matplotlib.animation as animation
+from matplotlib.animation import FuncAnimation, PillowWriter
 
 #for saving simulations
 import pickle
@@ -56,8 +58,9 @@ class Simulation():
     
     @author: Max Bloom 
     """
-
-    def __init__(self, model=None, shape=(None,), method= "LSODA", atol= 1e-6, rtol= 1e-6, noisy=False, noise_stddev=0.01, layermax=0):
+#TODO implement starting from a saved run
+#TODO implement starting from an arbtitrary initial condition ( to test low freq. spatial noise)
+    def __init__(self, model=None, shape=(None,), method= "LSODA", atol= 1e-6, rtol= 1e-6, noisy=False, noise_stddev=0.01, layermax=0, nonstd_init=False, starting_ice=None,startingNtot =None):
         """Initialize the Simulation
         Parameters
         ----------
@@ -73,8 +76,8 @@ class Simulation():
         """
         # model integrator arguments
         self.model = model #integratable differential equation model 
-        self.method = method #default to emulate odeint TODO unused since designed for solve_ivp
-        self.atol = atol #default absolute tolerance TODO unused
+        self.method = method #default to emulate odeint for solve_ivp
+        self.atol = atol #default absolute tolerance 
         self.rtol = rtol #default relative tolerance
         self.shape = shape #shape of initial condition
 
@@ -311,15 +314,26 @@ class Simulation():
         # Call the ODE solver
         while True:
             # Integrate up to next time step
-            y = odeint(self.model, np.reshape(ylast,np.prod(np.shape(ylast))), self.tinterval, args=model_args, rtol=1e-12)
+            if self.method == 'odeint':
+                solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method='RK45', args=model_args, rtol=self.rtol, atol=self.atol)#, t_eval=self.tinterval)
+                # print('ylast: ', ylast)
+                # print("shape of ylast: ", np.shape(ylast))
+                # print("np.prod(np.shape(ylast)): ", np.prod(np.shape(ylast)))
+                # y = odeint(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), args=model_args, rtol=self.rtol, atol=self.atol, tfirst=True)
+                y = solve_ivp_result.y[:, len(solve_ivp_result.t)-1]#y[:,-1] : get last timestep that solve_ivp returns
+                #y = y[1]
+            else:
+                solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method=self.method, args=model_args, t_eval=self.tinterval, rtol=self.rtol, atol=self.atol)
+                #get new y values out of solve_ivp_results dictionary
+                y = solve_ivp_result.y[:, len(solve_ivp_result.t)-1]#y[:,-1] : get last timestep that solve_ivp returns
             
-            # Update the state                  #NOTE: prod(shape(ylast)) is like (2*nx*ny)
+            # Update the state                 
             if self.dimension == 0:
-                ylast = y[1]
+                ylast = y
             elif self.dimension == 1:
-                 ylast = np.reshape(y[1],(2,self.shape[0]))
+                 ylast = np.reshape(y,(2,self.shape[0])) #used to by ylast = y[1] for odeint
             elif self.dimension == 2:
-                ylast = np.reshape(y[1],(2,self.shape[0],self.shape[1]))
+                ylast = np.reshape(y,(2,self.shape[0],self.shape[1])) 
             tlast += self.deltaT
             counter += 1
             
@@ -362,12 +376,22 @@ class Simulation():
                         print('counter, layer, depth_of_facet_in_layers, delta_depth')
                     print(counter-1, lastlayer, maxpoint-minpoint, maxpoint-minpoint-lastdiff)
                 lastdiff = maxpoint-minpoint
+
+                #break if too many steps for discretization
+                if lastdiff > max(self.shape)//10:
+                    print('Warning: too many steps for discretization')
+                    break
+                
                 lastlayer += 1
                 
             # Test whether we're finished
             if self.uselayers:
                 if print_progress:
-                    print("appx progress:" , round((layer/(self.layermax-1))*100, 2),"%",end="\r")
+                    if self.sigmastepmax <0:
+                        prog = round((-1*layer/(self.layermax-1))*100, 2)
+                    else:
+                        prog = round((layer/(self.layermax-1))*100, 2)
+                    print("appx progress:" , prog,"%",end="\r")
                 if self.sigmastepmax > 0:
                     if layer > self.layermax-1:
                         print('breaking because reached max number of layers grown')
@@ -391,27 +415,37 @@ class Simulation():
             self.run()
         return self._results
 
-    def getFliq(self):# -> np.ndarray:
-        Fliq = []
-        for step in range(len(self.results()['t'])):
-            next_Fliq, next_Ntot = self.results()['y'][step]
-            #normalize results
-            Fliq.append(next_Fliq)
-        return np.array(Fliq)#, np.array(Ntot)
-        #return np.array([i for i,_ in self.results()['y'][:]])
+    def getFliq(self, step=None):# -> np.ndarray:
+        if step == None:
+            Fliq = []
+            for i in range(len(self.results()['t'])):
+                #next_Fliq, next_Ntot = self.results()['y'][i]
+                next_Fliq = self.results()['y'][i][0]
+                #normalize results
+                Fliq.append(next_Fliq)
+            return np.array(Fliq)
+        else:
+            return self.results()['y'][step][0]
         
-    def getNtot(self) -> np.ndarray:
-        Ntot = []
-        for step in range(len(self.results()['t'])):
-            next_Fliq, next_Ntot = self.results()['y'][step]
-            #normalize results
-            Ntot.append(next_Ntot)
-        return np.array(Ntot)
+    def getNtot(self, step=None) -> np.ndarray:
+        if step == None:
+            Ntot = []
+            for step in range(len(self.results()['t'])):
+                #next_Fliq, next_Ntot = self.results()['y'][step]
+                next_Ntot = self.results()['y'][step][1]
+                #normalize results
+                Ntot.append(next_Ntot)
+            return np.array(Ntot)
+        else:   
+            return self.results()['y'][step][1]
 
-    def getNice(self) -> np.ndarray:
-        return self.getNtot() - self.getFliq()
+    def getNice(self, step=None) -> np.ndarray:
+        if step == None:
+            return self.getNtot() - self.getFliq()
+        else:
+            return self.getNtot(step) - self.getFliq(step)
 
-    def plot(self, completion=1, figurename='', ice=True,tot=False,liq=False, surface=True, contour=False):# -> matplotlib_figure: ## , method = 'surface'): #TODO: test plotting
+    def plot(self, completion=1, figurename='', ice=True, tot=False, liq=False, surface=True, contour=False):# -> matplotlib_figure: ## , method = 'surface'): #TODO: test plotting
         """ Plot the results of the simulation.
         
         Args:
@@ -432,80 +466,77 @@ class Simulation():
         
         """
         """ plot results of simulation, returns matplotlib figure """
-        if self._plot == None or self._rerun:
-            #create plot of results
-            step = int((len(self.results()['t'])-1)*completion)
-            if liq:
-                Fliq = self.getFliq()
-            if tot:
-                Ntot = self.getNtot()
+        #if self._plot == None or self._rerun:
+        #create plot of results
+        step = floor((len(self.results()['t'])-1)*completion)
+                    
+        # Plot the results
+        self._plot = plt.figure(figurename)
+        if self.dimension == 0:
+            # Plot results
+            plt.xlabel(r't ($\mu s$)')
+            plt.grid('on')
             if ice: 
                 Nice = self.getNice()
-                        
-            # Plot the results
-            self._plot = plt.figure(figurename)
-            if self.dimension == 0:
-                # Plot results
-                plt.xlabel(r't ($\mu s$)')
-                
-                plt.grid('on')
-                if ice: 
-                    Nice = self.getNice()
-                    plt.plot(self.t, Nice)
-                    plt.ylabel(r'$N_{ice} $')
-                if tot:
-                    plt.plot(self.t, Ntot)
-                    plt.ylabel(r'$N_{ice} + $N_{QLL} $')
-                if liq:
-                    plt.plot(self.t, Fliq)
-                    plt.ylabel(r'$N_{QLL} $')
-                plt.legend()
-                plt.xlabel('Time')
-                plt.ylabel('Layers of ice')
-            elif self.dimension == 1:
-                ax = plt.axis()
+                plt.plot(self.t, Nice)
+                plt.ylabel(r'$N_{ice} $')
+            if tot:
+                Ntot = self.getNtot()
+                plt.plot(self.t, Ntot)
+                plt.ylabel(r'$N_{ice} + $N_{QLL} $')
+            if liq:
+                Fliq = self.getFliq()
+                plt.plot(self.t, Fliq)
+                plt.ylabel(r'$N_{QLL} $')
+            plt.legend()
+            plt.xlabel('Time')
+            plt.ylabel('Layers of ice')
+        elif self.dimension == 1:
+            ax = plt.axis()
+            if ice:
+                plt.plot(self.x, self.getNice(step), 'k', label='ice')
+            if tot:
+                plt.plot(self.x, self.getNtot(step), 'b', label='ice+QLL')
+                #plt.plot(x-xmid, Fliq+Nice-minpoint, 'b', label='ice+liquid', lw=linewidth)
+            if liq:
+                plt.plot(self.x, self.getFliq(step), 'g', label='QLL')
+            plt.legend()
+            plt.xlabel(r'x ($\mu m$)')
+            plt.ylabel('Layers of ice')
+        elif self.dimension == 2:
+            #access coordinate arrays for plotting
+            ys, xs = np.meshgrid(self.y, self.x)
+            
+            #print(xs.shape, ys.shape, Nice.shape)
+            ax = plt.axes(projection='3d')
+            if surface:
                 if ice:
-                    plt.plot(self.x, Nice[step], 'k', label='ice')
+                    ax.plot_surface(X=xs, Y=ys, Z=self.getNice(step), cmap='viridis')#, vmin=0, vmax=200)
                 if tot:
-                    plt.plot(self.x, Ntot[step], 'b', label='ice+QLL')
-                    #plt.plot(x-xmid, Fliq+Nice-minpoint, 'b', label='ice+liquid', lw=linewidth)
+                    ax.plot_surface(X=xs, Y=ys, Z=self.getNtot(step), cmap='YlGnBu_r')#, vmin=0, vmax=200)
                 if liq:
-                    plt.plot(self.x, Fliq[step], 'g', label='QLL')
-                plt.legend()
-                plt.xlabel(r'x ($\mu m$)')
-                plt.ylabel('Layers of ice')
-            elif self.dimension == 2:
-                #access coordinate arrays for plotting
-                xs, ys = np.meshgrid(self.x, self.y)
-                
-                #print(xs.shape, ys.shape, Nice.shape)
-                ax = plt.axes(projection='3d')
-                ax.set_xlabel(r'x ($\mu m$)')
-                ax.set_ylabel(r'y ($\mu m$)')
-                ax.set_zlabel('Layers of ice')
-                if surface:
-                    if ice:
-                        ax.plot_surface(X=xs, Y=ys, Z=Nice[step], cmap='viridis')#, vmin=0, vmax=200)
-                    if tot:
-                        ax.plot_surface(X=xs, Y=ys, Z=Ntot[step], cmap='YlGnBu_r')#, vmin=0, vmax=200)
-                    if liq:
-                        ax.plot_surface(X=xs, Y=ys, Z=Fliq[step], cmap='YlGnBu_r')
-                elif contour: #elif method == 'contour':
-                    levels = np.arange(-6,12,0.25)
-                    if ice:
-                        ax.contour(xs,ys, Nice[step], extent=(0, 2, 0, 2), cmap='YlGnBu_r', vmin=0, vmax=200, zorder=1, levels=levels)
-                    if tot:
-                        ax.contour(xs,ys, Ntot[step], extent=(0, 2, 0, 2), cmap='YlGnBu_r', vmin=0, vmax=200, zorder=1, levels=levels)
-                    if liq:
-                        ax.contour(xs,ys, Fliq[step], extent=(0, 2, 0, 2), cmap='YlGnBu_r', vmin=0, vmax=200, zorder=1, levels=levels)
-            else:
-                print('Error: dimension not supported')
-                return None
+                    ax.plot_surface(X=xs, Y=ys, Z=self.getFliq(step), cmap='YlGnBu_r')
+            elif contour: #elif method == 'contour':
+                levels = np.arange(-6,12,0.25)
+                if ice:
+                    ax.contour(xs,ys, self.getNice(step), extent=(0, 2, 0, 2), cmap='YlGnBu_r', vmin=0, vmax=200, zorder=1, levels=levels)
+                if tot:
+                    ax.contour(xs,ys, self.getNtot(step), extent=(0, 2, 0, 2), cmap='YlGnBu_r', vmin=0, vmax=200, zorder=1, levels=levels)
+                if liq:
+                    ax.contour(xs,ys, self.getFliq(step), extent=(0, 2, 0, 2), cmap='YlGnBu_r', vmin=0, vmax=200, zorder=1, levels=levels)
+            
+            ax.set_xlabel(r'x ($\mu m$)')
+            ax.set_ylabel(r'y ($\mu m$)')
+            ax.set_zlabel('Layers of ice')
+            # else:
+            #     print('Error: dimension not supported')
+            #     return None
         plt.show()
         #return self._plot 
         pass
     
-    def animate(self, proportionalSpeed=True, ice=True, tot=False, liq=False, surface=True, crossSection=False):
+    def animate(self, proportionalSpeed=True, ice=True, tot=False, liq=False, surface=True,
+                 crossSection=False, ret=False, speed=1, focus_on_growth=True):
         """ Animate the results of the simulation.
 
         Args:
@@ -527,13 +558,18 @@ class Simulation():
         
         crossSection: bool
             Plot a cross section (of the 2d model)?
+        
+        ret: bool
+            Return the animation, or just pass.
         """
         if self._animation == None:
             #create animation of results
             num_steps = len(self.results()['t'])
             #shape of results is (num_steps, 2, nx, ny)
             Nice = self.getNice()
-
+            if tot:
+                Ntot = self.getNtot()
+            
             #shape of fliq, ntot and nice should be (num_steps, nx, ny)
             fig = plt.figure()
             #global update_fig#neccesary for saving the animation- but we cant save the animation object anyway so unnecessary
@@ -564,30 +600,34 @@ class Simulation():
                 plt.legend()
             elif self.dimension == 2: 
                 #access coordinate arrays for plotting
-                xs, ys = np.meshgrid(self.x, self.y)
+                #np.meshgrid returns y before x
+                ys, xs = np.meshgrid(self.y, self.x)
+
                 #3d animation of the results
                 #print(xs.shape, ys.shape, Nice.shape)
                 ax = plt.axes(projection='3d')
+
+                #set up axis labels and limits
+                ax.set_xlabel(r'$x (\mu m$)')#,fontsize=fontsize)
+                ax.set_ylabel(r'$y (\mu m$)')#,fontsize=fontsize)
+                ax.set_zlabel(r'$ice \ layers$')#,fontsize=fontsize)
+                ax.set_xlim(0, max(self.x))
+                ax.set_ylim(0, max(self.y))
+                if not focus_on_growth:
+                    ax.set_zlim3d(np.min(Nice)-0.5, np.max(Nice)+1.5) # show full range of ice layers grown (0 to layermax)
+
                 #labels
-                
                 def update_fig(num):
                     ax.clear() # remove last iteration of plot 
-
-                    ax.set_xlabel(r'$x (\mu m$)')#,fontsize=fontsize)
-                    ax.set_ylabel(r'$y (\mu m$)')#,fontsize=fontsize)
-                    ax.set_zlabel(r'$ice \ layers$')#,fontsize=fontsize)
                     #limits
-                    #ax.set_zlim3d(-self.layermax, self.layermax)
-                    ax.set_zlim3d(np.min(Nice)-0.5, np.max(Nice)+1.5)
-                    ax.set_ylim(0, max(self.y))
-                    ax.set_xlim(0, max(self.x))
-                    ax.set_aspect('equal')
-
+                    if focus_on_growth: #stay zoomed on new growth
+                        ax.set_zlim3d(np.min(Nice[num]-0.5), np.max(Nice[num]+1.5)) 
+                    
+                    #ax.set_aspect('equal') doesnt work for 3d, breaking animation for some reason
                     if surface:
                         if ice:
-                            ax.plot_surface(X=xs.T, Y=ys.T, Z=Nice[num], cmap='viridis')#, vmin=0, vmax=200)#plot the surface of the ice 
+                            ax.plot_surface(X=xs, Y=ys, Z=Nice[num], cmap='viridis')#, vmin=0, vmax=200)#plot the surface of the ice 
                         if tot:
-                            Ntot = self.getNtot()
                             ax.plot_surface(X=xs, Y=ys, Z=Ntot[num], cmap='YlGnBu_r')#, vmin=0, vmax=200)#plot the surface of the QLL
                         #cross section
                         # xmid = round(np.shape(Nice)[0]/2)
@@ -601,7 +641,6 @@ class Simulation():
                         if ice:
                             ax.wireframe(X=xs, Y=ys, Z=Nice[num], cmap='viridis')#, vmin=0, vmax=200) #plot the surface of the ice 
                         if tot:
-                            Ntot = self.getNtot()
                             ax.wireframe(X=xs, Y=ys, Z=Ntot[num], cmap='YlGnBu_r')#, vmin=0, vmax=200)#plot the surface of the QLL
                     pass
             
@@ -609,12 +648,19 @@ class Simulation():
             if proportionalSpeed:#TODO: scale interval to make length of gif/mp4 be 10 seconds, scaling speed of animation by factor proportional to length of simulation
                 intrvl = int(50*30/self.layermax)+1#targeting speeds similar to 50ms interval at 30 layers, if more layers it will speed it up to keep the animation at the same visual speed
             else:
-                intrvl = 50
+                intrvl = 5 #5ms interval
+
+            if speed != 1: # increase animation replay speed by "speed" factor
+                intrvl = intrvl // speed
+            
+
             #self._animation = animation.FuncAnimation(self._anim_fig, update_fig, num_steps, interval=intrvl, blit=False, cache_frame_data=False, repeat = True)
-            anim = animation.FuncAnimation(fig, update_fig, num_steps, interval=intrvl, blit=False, cache_frame_data=False, repeat = True) #pickle does not like saving animation, also it is a a lot of data to save
+            anim = FuncAnimation(fig, update_fig, num_steps, interval=intrvl, blit=False, cache_frame_data=False, repeat = True) #pickle does not like saving animation, also it is a a lot of data to save
         plt.show()
-        return anim#self._animation
-        pass
+        if ret:
+            return anim#self._animation
+        else:
+            pass
 
     def save(self, id = []) -> None:
         """ Saves Simulation object to a pickle file
@@ -652,8 +698,7 @@ class Simulation():
                 Writer = animation.writers['ffmpeg']
                 writer = Writer(fps=15, bitrate=1800)
             elif filetype == 'gif':
-                Writer = animation.writers['imagemagick']
-                writer = Writer(fps=15, bitrate=1800)
+                writer = PillowWriter(fps=60,bitrate=1800)#animation.writers['imagemagick']
             else:
                 print('filetype not supported')
                 return
@@ -663,7 +708,7 @@ class Simulation():
             return
 
         try:
-            self.animate().save(filename+'.'+filetype, writer=writer)
+            self.animate(ret=True).save(filename+'.'+filetype, writer=writer)
         except Exception as e:
             print(e)
             print('Error saving animation')
