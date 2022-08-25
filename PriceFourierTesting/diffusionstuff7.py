@@ -131,6 +131,8 @@ def f1d(t, y, float_params, int_params, sigmastep): #sigmastep is an array
     dFliq0_dt += dy
     dNtot_dt += dy 
 
+    dFliq0_dt = getNliq_array(dNtot_dt,Nstar,Nbar,types.int32(niter)) # This updates to remove any drift (normally done in run())
+
     # Package for output
     #derivs = np.reshape(np.array([[*dFliq0_dt], [*dNtot_dt]]),2*nx) #need to unpack lists back into arrays of proper shape (2,nx) before reshaping
     derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx)
