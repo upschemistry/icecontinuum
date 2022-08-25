@@ -58,9 +58,10 @@ class Simulation():
     
     @author: Max Bloom 
     """
-#TODO implement starting from a saved run
-#TODO implement starting from an arbtitrary initial condition ( to test low freq. spatial noise)
-    def __init__(self, model=None, shape=(None,), method= "LSODA", atol= 1e-6, rtol= 1e-6, noisy=False, noise_stddev=0.01, layermax=0, nonstd_init=False, starting_ice=None,startingNtot =None):
+
+    #TODO implement starting from an arbtitrary initial condition ( to test low freq. spatial noise)
+        #TODO implement starting from a saved run
+    def __init__(self, model=None, shape=(None,), method= "LSODA", atol= 1e-6, rtol= 1e-6, noisy=False, noise_stddev=0.01, layermax=0, nonstd_init=False, starting_ice=None, startingNtot=None):
         """Initialize the Simulation
         Parameters
         ----------
@@ -81,6 +82,11 @@ class Simulation():
         self.rtol = rtol #default relative tolerance
         self.shape = shape #shape of initial condition
 
+        # make initial condition an attribute so it can be accessed for initialization in run()
+        self.nonstd_init = nonstd_init
+        self.starting_ice = starting_ice
+        self.startingNtot = startingNtot
+
         #calculate dimension of initial condition
         if len(shape) == 1 and shape[0] == 1:
             self.dimension = 0
@@ -91,7 +97,7 @@ class Simulation():
         Nbar = 1.0 # new Nbar from VMD, 260K
         Nstar = .9/(2*np.pi) # ~=0.14137
         D = 0.02e-2 # micrometers^2/microsecond # Diffusion coefficient #TODO: temperature dependent?
-        nmpermonolayer = 0.3 #Thickness of a monolayer of ice #TODO: Citation? Sazaki et al. said 0.34 nm per monolayer
+        nmpermonolayer = 0.3 #Thickness of a monolayer of ice #TODO: From MD, 2016 paper?  Sazaki et al. said 0.34 nm per monolayer
         umpersec_over_mlyperus = (nmpermonolayer/1e3*1e6)# Conversion of nanometers per monolayer to micron/sec over monolayers/microsecond
         nu_kin = 49 # microns/second #TODO: citation? 
         deprate = nu_kin/umpersec_over_mlyperus # monolayers per microsecond # Deposition rate
@@ -263,28 +269,40 @@ class Simulation():
             #packed_float_params = np.array([Nbar, Nstar, sigma0, deprate, DoverdeltaX2])
             packed_int_params = np.array(list(map(int64,[niter,nx,ny]))) # sigmastep math in f2d in diffusionstuff7 requires int64
         
-        # Lay out the initial system
-        Nice = np.ones(self.shape)
-        if self.noisy_init:
-            # Initialize with noise
-            noise = np.random.normal(0,self.noise_std_dev,self.shape)
-            Nice += noise
-        if self.dimension == 0:
-            Fliq = Nbar#ds.getNliq(Nice,Nstar,Nbar,niter) fliq updates to this but starts as nbar
-            #sigma = sigmastepmax
-            model_args = (packed_float_params,niter)
-            nliq_func = ds.getNliq # function to get to update fliq
-        elif self.dimension == 1:
-            Fliq = ds.getNliq_array(Nice,Nstar,Nbar,niter)
-            sigma = ds.getsigmastep(self.x, np.max(self.x), self.center_reduction, self.sigmastepmax)
-            model_args = (packed_float_params,packed_int_params,sigma)
-            nliq_func = ds.getNliq_array # function to get to update fliq
-        elif self.dimension == 2:
-            Fliq = ds.getNliq_2d_array(Nice,Nstar,Nbar,niter) # Initialize as a pre-equilibrated layer of liquid over ice
-            sigma = ds.getsigmastep_2d(self.x,self.y, self.center_reduction, self.sigmastepmax) # supersaturation
-            model_args = (packed_float_params,packed_int_params,sigma) 
-            nliq_func = ds.getNliq_2d_array # function to get to update fliq
-        Ntot = Fliq + Nice
+    #nonstd_init=False, starting_ice=None, startingNtot=None
+
+        if self.nonstd_init:
+            #nonstandard initial conditions
+            Nice = self.starting_ice
+            Ntot = self.startingNtot
+            Fliq = Ntot - Nice
+            if self.noisy_init:
+                # Initialize with noise
+                noise = np.random.normal(0,self.noise_std_dev,self.shape)
+                Nice += noise
+        else:
+            # Lay out the initial system
+            Nice = np.ones(self.shape)
+            if self.noisy_init:
+                # Initialize with noise
+                noise = np.random.normal(0,self.noise_std_dev,self.shape)
+                Nice += noise
+            if self.dimension == 0:
+                Fliq = Nbar#ds.getNliq(Nice,Nstar,Nbar,niter) fliq updates to this but starts as nbar
+                #sigma = sigmastepmax
+                model_args = (packed_float_params,niter)
+                nliq_func = ds.getNliq # function to get to update fliq
+            elif self.dimension == 1:
+                Fliq = ds.getNliq_array(Nice,Nstar,Nbar,niter)
+                sigma = ds.getsigmastep(self.x, np.max(self.x), self.center_reduction, self.sigmastepmax)
+                model_args = (packed_float_params,packed_int_params,sigma)
+                nliq_func = ds.getNliq_array # function to get to update fliq
+            elif self.dimension == 2:
+                Fliq = ds.getNliq_2d_array(Nice,Nstar,Nbar,niter) # Initialize as a pre-equilibrated layer of liquid over ice
+                sigma = ds.getsigmastep_2d(self.x,self.y, self.center_reduction, self.sigmastepmax) # supersaturation
+                model_args = (packed_float_params,packed_int_params,sigma) 
+                nliq_func = ds.getNliq_2d_array # function to get to update fliq
+            Ntot = Fliq + Nice
 
         if self.dimension == 0:
             y0 = np.array([Fliq, 0.0])#starts at zero ice to get see more layers form at beginning
@@ -331,7 +349,7 @@ class Simulation():
             if self.dimension == 0:
                 ylast = y
             elif self.dimension == 1:
-                 ylast = np.reshape(y,(2,self.shape[0])) #used to by ylast = y[1] for odeint
+                ylast = np.reshape(y,(2,self.shape[0])) #used to by ylast = y[1] for odeint
             elif self.dimension == 2:
                 ylast = np.reshape(y,(2,self.shape[0],self.shape[1])) 
             tlast += self.deltaT
