@@ -60,11 +60,39 @@ def fqllprime_next(fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
     return 1 + fstar*np.sin(2*np.pi*(Ntot-Nbar*fqll_last))
 
+@njit("f8(f8,f8,f8,f8,f8)") #quirk: fqll_last is a float but must also have array implemenetation for 1-d model
+def getdfqll_dNtot_next(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar):
+    fstar = Nstar/Nbar
+    return fstar*np.cos(2*np.pi*(Ntot-fqll_last))*2*np.pi*(1-Nbar*dfqll_dNtot_last)
+
+@njit("f8[:](f8[:],f8[:],f8[:],f8,f8)",parallel=prll_1d) #quirk: fqll_last is a float but must be array for above implemenetation
+def getdfqll_dNtot_next_array(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar):
+    fstar = Nstar/Nbar
+    return fstar*np.cos(2*np.pi*(Ntot-fqll_last))*2*np.pi*(1-Nbar*dfqll_dNtot_last)
+
 @njit("f8[:,:](f8[:,:],f8[:,:],f8[:,:],f8,f8)",parallel=prll_2d) #quirk: fqll_last is a float but must be array for above implemenetation
 #@vectorize(["float64(float64,float64,float64,float64,float64)"], target='cuda')
 def getdfqll_dNtot_next_2d_array(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
     return fstar*np.cos(2*np.pi*(Ntot-fqll_last))*2*np.pi*(1-Nbar*dfqll_dNtot_last)
+
+@njit("f8(f8,f8,f8,i4)")
+def getdNliq_dNtot(Ntot,Nstar,Nbar,niter):
+    dfqll_dNtot_last = 0.0
+    fqll_last = 1.0
+    for i in range(niter):
+        dfqll_dNtot_last = getdfqll_dNtot_next(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar)
+        fqll_last = fqll_next(fqll_last,Ntot,Nstar,Nbar)
+    return dfqll_dNtot_last*Nbar 
+
+@njit("f8[:](f8[:],f8,f8,i4)",parallel=prll_1d)
+def getdNliq_dNtot_array(Ntot,Nstar,Nbar,niter):
+    dfqll_dNtot_last = np.zeros(np.shape(Ntot)[0])
+    fqll_last = np.ones(np.shape(Ntot)[0])
+    for i in range(niter):
+        dfqll_dNtot_last = getdfqll_dNtot_next_array(dfqll_dNtot_last,fqll_last,Ntot,Nstar,Nbar)
+        fqll_last = fqll_next_array(fqll_last,Ntot,Nstar,Nbar)
+    return dfqll_dNtot_last*Nbar 
 
 @njit("f8[:,:](f8[:,:],f8,f8,i4)", parallel=prll_2d)
 #@vectorize([float64(float64,float64,float64,types.int32)], target='cuda')
@@ -91,7 +119,7 @@ def f0d(y, t, float_params, niter):
     depsurf = deprate * sigD
 
     #dFliq0_dt = getNliqprime(Ntot0,Nstar,Nbar,niter)*depsurf
-    dFliq0_dt = Nstar*np.cos(2*np.pi*(Ntot0))*2*np.pi*depsurf
+    dFliq0_dt = getdNliq_dNtot(Ntot0,Nstar,Nbar,int(niter))*depsurf
     dNtot_dt = depsurf
     
     derivs = np.array([dFliq0_dt, dNtot_dt])
@@ -121,7 +149,7 @@ def f1d(t, y, float_params, int_params, sigmastep): #sigmastep is an array
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
     sigD = (sigmastep - delta * sigma0)/(1+delta*sigma0)
     depsurf = deprate * sigD
-    dFliq0_dt =  Nstar*np.cos(2*np.pi*(Ntot0))*2*np.pi*depsurf
+    dFliq0_dt = getdNliq_dNtot_array(Ntot0,Nstar,Nbar,niter)*depsurf
     dNtot_dt = depsurf
 
     # Diffusion
@@ -130,8 +158,6 @@ def f1d(t, y, float_params, int_params, sigmastep): #sigmastep is an array
     # Combined
     dFliq0_dt += dy
     dNtot_dt += dy 
-
-    dFliq0_dt = getNliq_array(dNtot_dt,Nstar,Nbar,types.int32(niter)) # This updates to remove any drift (normally done in run())
 
     # Package for output
     #derivs = np.reshape(np.array([[*dFliq0_dt], [*dNtot_dt]]),2*nx) #need to unpack lists back into arrays of proper shape (2,nx) before reshaping
