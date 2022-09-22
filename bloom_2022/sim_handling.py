@@ -262,6 +262,8 @@ class Simulation():
             # Bundle parameters for ODE solver
             packed_float_params = np.array([Nbar, Nstar, sigma0, deprate, DoverdeltaX2])
             packed_int_params = np.array(list(map(int32,[niter,nx])))#f1d expects int32s
+    
+            #NOTE: niter removed as of diffusionstuff8
         if self.dimension == 2:
             #DoverdeltaY2 = self.float_params['DoverdeltaY2'] #unused
             ny = self.int_params['ny']
@@ -331,8 +333,10 @@ class Simulation():
 
         # Call the ODE solver
         while True:
-            # Integrate up to next time step
+            # Integrate up to next time step 
+            
             if self.method == 'odeint':
+                method = 'RK45'
                 solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method='RK45', args=model_args, rtol=self.rtol, atol=self.atol)#, t_eval=self.tinterval)
                 # print('ylast: ', ylast)
                 # print("shape of ylast: ", np.shape(ylast))
@@ -341,9 +345,10 @@ class Simulation():
                 y = solve_ivp_result.y[:, len(solve_ivp_result.t)-1]#y[:,-1] : get last timestep that solve_ivp returns
                 #y = y[1]
             else:
-                solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method=self.method, args=model_args, t_eval=self.tinterval, rtol=self.rtol, atol=self.atol)
-                #get new y values out of solve_ivp_results dictionary
-                y = solve_ivp_result.y[:, len(solve_ivp_result.t)-1]#y[:,-1] : get last timestep that solve_ivp returns
+                method = self.method
+            solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method=self.method, args=model_args, t_eval=self.tinterval, rtol=self.rtol, atol=self.atol)
+        
+            y = solve_ivp_result.y[:, len(solve_ivp_result.t)-1]#y[:,-1] : get last timestep that solve_ivp returns
             
             # Update the state                 
             if self.dimension == 0:
