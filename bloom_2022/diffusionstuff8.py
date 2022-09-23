@@ -34,16 +34,12 @@ def f0d(y, t, float_params, niter):
 def diffuse_1d(Fliq0,DoverdeltaX2):
     l = len(Fliq0)
     dy = np.zeros((l,))
-    for i in range(0,l):
+    for i in range(1,l):
         dy[i] = DoverdeltaX2*(Fliq0[i+1]-2*Fliq0[i]+Fliq0[i-1])
-        # Boundary Conditions (periodic at ends)
-        dy[0] = DoverdeltaX2*(Fliq0[1]-2*Fliq0[0]+Fliq0[l-1]) 
-        dy[l-1] = DoverdeltaX2*(Fliq0[0]-2*Fliq0[l-1]+Fliq0[l-2])
+    # Boundary Conditions (periodic at ends)
+    dy[0] = DoverdeltaX2*(Fliq0[1]-2*Fliq0[0]+Fliq0[l-1]) 
+    dy[l-1] = DoverdeltaX2*(Fliq0[0]-2*Fliq0[l-1]+Fliq0[l-2])
     return dy
-
-@njit("f8[:](f8[:],f8,f8)")#,parallel=prll_1d) #NOTE: to test with paralellization
-def get_qll_1d(Ntot,Nbar,Nstar):
-    return Nbar + Nstar * np.sin(2*np.pi*(Ntot - Nbar))
 
 @njit("f8[:](f8,f8[:],f8[:],f8[:])", parallel=prll_1d)#slower with paralellization right now
 def f1d(t, Ntot, float_params, sigmastep):
@@ -52,7 +48,7 @@ def f1d(t, Ntot, float_params, sigmastep):
     Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params
 
     # compute quasi-liquid layer from Ntot
-    NQLL = get_qll_1d(Ntot,Nbar,Nstar)# Nbar + Nstar * np.sin(2*np.pi*(Ntot - Nbar))
+    NQLL = Nbar + Nstar * np.sin(2*np.pi*(Ntot - Nbar))
     
     delta = (NQLL - (Nbar - Nstar))/(2*Nstar)
     sigD = (sigmastep - delta * sigma0)/(1+delta*sigma0)
