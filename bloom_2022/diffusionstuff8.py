@@ -36,10 +36,18 @@ def diffuse_1d(Fliq0,DoverdeltaX2):
     dy = np.zeros((l,))
     for i in range(1,l):
         dy[i] = DoverdeltaX2*(Fliq0[i+1]-2*Fliq0[i]+Fliq0[i-1])
-    # Boundary Conditions (periodic at ends)
+    # Periodic boundary conditions
     dy[0] = DoverdeltaX2*(Fliq0[1]-2*Fliq0[0]+Fliq0[l-1]) 
     dy[l-1] = DoverdeltaX2*(Fliq0[0]-2*Fliq0[l-1]+Fliq0[l-2])
     return dy
+
+@njit("f8[:](f8[:],f8,f8)")#,parallel=prll_1d) #NOTE: to test with paralellization
+#NOTE: this is used in sim_handling to get Fliq from Ntot
+def get_qll_1d(Ntot,Nbar,Nstar):
+    """ Returns the quasi-liquid layer thickness (in ice bilayer equivalents) from a
+        given Ntot.
+    """
+    return Nbar + Nstar * np.sin(2*np.pi*(Ntot - Nbar))
 
 @njit("f8[:](f8,f8[:],f8[:],f8[:])", parallel=prll_1d)#slower with paralellization right now
 def f1d(t, Ntot, float_params, sigmastep):
@@ -48,16 +56,15 @@ def f1d(t, Ntot, float_params, sigmastep):
     Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params
 
     # compute quasi-liquid layer from Ntot
-    NQLL = Nbar + Nstar * np.sin(2*np.pi*(Ntot - Nbar))
+    NQLL = get_qll_1d(Ntot,Nbar,Nstar)
     
+    #deposition 
     delta = (NQLL - (Nbar - Nstar))/(2*Nstar)
     sigD = (sigmastep - delta * sigma0)/(1+delta*sigma0)
-    depsurf = deprate * sigD
-    dNtot_dt = depsurf
-
+    dNtot_dt = deprate * sigD
     # Diffusion
     dy = diffuse_1d(NQLL,DoverdeltaX2)
-     
+
     # Combined
     dNtot_dt += dy
     return dNtot_dt

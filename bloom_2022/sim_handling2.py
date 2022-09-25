@@ -1,4 +1,5 @@
 from ctypes import py_object
+from functools import cache
 from math import floor
 import numpy as np
 from matplotlib import pyplot as plt
@@ -47,7 +48,9 @@ class Simulation():
     plot(): plots results of simulation
     animate(): animates results of simulation
     results(): returns results of simulation (handles running if necessary)
-    save(): saves simulation object to file
+    save(): saves simulation object to pickle file
+    save_profile(): saves profile of simulation object to pickle file for
+                    reproducability (does not save results)
     load(): loads simulation object from file
     
     save_plot(): saves plot of simulation object
@@ -88,7 +91,7 @@ class Simulation():
         self.startingNtot = startingNtot
 
         #calculate dimension of initial condition
-        if len(shape) == 1 and shape[0] == 1:
+        if len(shape) == 1 and shape[0] == 1:#if 1D and only one element
             self.dimension = 0
         else:
             self.dimension = len(shape)
@@ -152,7 +155,7 @@ class Simulation():
             c_r = self.center_reduction/100
 
             # Time steps
-            dtmaxtimefactor = 50 #TODO: what is this?
+            dtmaxtimefactor = 50 #TODO: meaning?
             dtmax = deltaX**2/D 
             self.deltaT = dtmax/dtmaxtimefactor #factored out of diffusion equation... 
             tmax = self.countermax*self.deltaT #ending time of simulation, used for solve_ivp
@@ -276,39 +279,43 @@ class Simulation():
 
         if self.nonstd_init:
             #nonstandard initial conditions
-            Nice = self.starting_ice
             Ntot = self.startingNtot
-            Fliq = Ntot - Nice
-            if self.noisy_init:
-                # Initialize with noise
-                noise = np.random.normal(0,self.noise_std_dev,self.shape)
-                Nice += noise
+            if self.dimension == 1:
+                qllfunc = lambda x : ds.get_qll_1d(x,self.float_params['Nbar'],self.float_params['Nstar'])
+            elif self.dimension == 2:
+                qllfunc = lambda x : ds.get_qll_2d(x,self.float_params['Nbar'],self.float_params['Nstar'])
+
+            Fliq = qllfunc(Ntot)
+            Nice = Ntot - Fliq
+
         else:
             # Lay out the initial system
             Nice = np.ones(self.shape)
             Fliq = np.zeros(self.shape)
+            Ntot = Fliq + Nice
             if self.noisy_init:
                 # Initialize with noise
                 noise = np.random.normal(0,self.noise_std_dev,self.shape)
                 Nice += noise
-            if self.dimension == 0:
-                #Fliq = Nbar # ds.getNliq(Nice,Nstar,Nbar,niter) fliq updates to this but starts as nbar
-                #sigma = sigmastepmax
-                model_args = (packed_float_params,niter)
-                #nliq_func = ds.getNliq # function to get to update fliq
-            elif self.dimension == 1:
-                #Fliq = ds.getNliq_array(Nice,Nstar,Nbar,niter)
-                sigma = ds.getsigmastep(self.x, np.max(self.x), self.center_reduction, self.sigmastepmax)
-                model_args = (packed_float_params,packed_int_params,sigma)
-                #nliq_func = ds.getNliq_array # function to get to update fliq
-                get_Fliq_func = ds.get_qll_1d
-            elif self.dimension == 2:
-                #NOTE: DEPRECATED #Fliq = ds.getNliq_2d_array(Nice,Nstar,Nbar,niter) # Initialize as a pre-equilibrated layer of liquid over ice
-                sigma = ds.getsigmastep_2d(self.x,self.y, self.center_reduction, self.sigmastepmax) # supersaturation
-                model_args = (packed_float_params,packed_int_params,sigma) 
-                #nliq_func = ds.getNliq_2d_array # function to get to update fliq
-                get_Fliq_func = ds.get_qll_2d
-            Ntot = Fliq + Nice
+        if self.dimension == 0:
+            #Fliq = Nbar # ds.getNliq(Nice,Nstar,Nbar,niter) fliq updates to this but starts as nbar
+            #sigma = sigmastepmax
+            model_args = (packed_float_params,niter)
+            #nliq_func = ds.getNliq # function to get to update fliq
+        elif self.dimension == 1:
+            #Fliq = ds.getNliq_array(Nice,Nstar,Nbar,niter)
+            sigma = ds.getsigmastep(self.x, np.max(self.x), self.center_reduction, self.sigmastepmax)
+            #model_args = (packed_float_params,packed_int_params,sigma)
+            model_args = (packed_float_params,sigma)
+            #nliq_func = ds.getNliq_array # function to get to update fliq
+            get_Fliq_func = ds.get_qll_1d
+        elif self.dimension == 2:
+            #NOTE: DEPRECATED #Fliq = ds.getNliq_2d_array(Nice,Nstar,Nbar,niter) # Initialize as a pre-equilibrated layer of liquid over ice
+            sigma = ds.getsigmastep_2d(self.x,self.y, self.center_reduction, self.sigmastepmax) # supersaturation
+            model_args = (packed_float_params,packed_int_params,sigma) 
+            #nliq_func = ds.getNliq_2d_array # function to get to update fliq
+            get_Fliq_func = ds.get_qll_2d
+            
 
         # if self.dimension == 0:
         #     y0 = np.array([Fliq, 0.0])#starts at zero ice to get see more layers form at beginning
@@ -352,7 +359,6 @@ class Simulation():
             #print("np.prod(np.shape(ylast)): ", np.prod(np.shape(ylast)))
             #print('ylast: ', ylast)
             
-
             # Update the state                 
             if self.dimension == 0:
                 ylast = y
@@ -446,31 +452,38 @@ class Simulation():
             self.run()
         return self._results
 
-    def getFliq(self, step=None):# -> np.ndarray:
-        if step == None:
-            Fliq = []
-            for i in range(len(self.results()['t'])):
-                #next_Fliq, next_Ntot = self.results()['y'][i]
-                next_Fliq = self.results()['y'][i][0]
-                #normalize results
-                Fliq.append(next_Fliq)
-            return np.array(Fliq)
-        else:
-            return self.results()['y'][step][0]
-        
+    @cache # since frequently combined with subsequent calls
     def getNtot(self, step=None) -> np.ndarray:
+        """ Returns Ntot at a given step (or array of all steps if unspecified) """
         if step == None:
             Ntot = []
             for step in range(len(self.results()['t'])):
-                #next_Fliq, next_Ntot = self.results()['y'][step]
-                next_Ntot = self.results()['y'][step][1]
-                #normalize results
+                next_Ntot = self.results()['y'][step]
                 Ntot.append(next_Ntot)
             return np.array(Ntot)
         else:   
-            return self.results()['y'][step][1]
+            return self.results()['y'][step]#[1]
 
+    def getFliq(self, step=None) -> np.ndarray:
+        """ Returns the liquid fraction at a given step (or array of all steps if unspecified) """
+        #pre-fill qll_func call with Nbar and Nstar
+        #if self.dimension == 0: #todo
+        if self.dimension == 1:
+            qllfunc = lambda x : ds.get_qll_1d(x,self.float_params['Nbar'],self.float_params['Nstar'])
+        elif self.dimension == 2:
+            qllfunc = lambda x : ds.get_qll_2d(x,self.float_params['Nbar'],self.float_params['Nstar'])
+        
+        if step == None:
+            Fliq = []
+            for x in self.getNtot():
+                next_Fliq = qllfunc(x)
+                Fliq.append(next_Fliq)
+            return np.array(Fliq)
+        else:
+            return qllfunc(self.results()['y'][step])
+    
     def getNice(self, step=None) -> np.ndarray:
+        """ Returns the ice fraction at a given step (or array of all steps if unspecified) """
         if step == None:
             return self.getNtot() - self.getFliq()
         else:
@@ -596,7 +609,7 @@ class Simulation():
         if self._animation == None:
             #create animation of results
             num_steps = len(self.results()['t'])
-            #shape of results is (num_steps, 2, nx, ny)
+            #shape of results is (num_steps, nx, ny)
             Nice = self.getNice()
             if tot:
                 Ntot = self.getNtot()
@@ -709,7 +722,23 @@ class Simulation():
             pickle.dump(self, f)
         pass
 
-    def load(self, filename: str) -> py_object:
+    def save_profile(self, id = [], filename = None) -> None:
+        """ Saves profile of Simulation object to a pickle file for reproducability
+        
+        args:
+            id: list of strings to append to filename: what makes this simulation unique
+            filename: name of file to save to, if omitted uses id to make filename
+        """
+        id = ''.join('_'+i for i in id)
+        if filename is None:
+            filename = self.model.__name__+'_simulation'+id+'.pkl'
+
+        with open(filename, 'wb') as f:
+            print("saving to", f)
+            pickle.dump(self, f)
+        pass
+
+    def _load(self, filename: str) -> py_object:
         """ Loads and initializes Simulation object from pickle file  """
         with open(filename, 'rb') as f:
             self = pickle.load(f)
@@ -858,8 +887,7 @@ class Simulation():
 def loadSim(filename: str) -> py_object:
         """ Loads and initializes Simulation object from pickle file  """
         with open(filename, 'rb') as f:
-            self = pickle.load(f)
-        return self
+            return pickle.load(f) #self object is loaded
 
 """
 Performance testing functions for the ice model.
