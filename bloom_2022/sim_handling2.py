@@ -144,7 +144,9 @@ class Simulation():
 
         if self.dimension > 0:
             nx = self.shape[0] # Number of points in simulation box
-            xmax = 50 # range of x
+            #xmax = 50_000 # range of x #TODO: testing 1000x for nanometers instead of microns - larger dx = no numerical instability?
+            #xmax = 250 #5x larger #NOTE: this didnt fix the numerical instability
+            xmax = 50 #default 
             self.x = np.linspace(0, xmax, nx)
 
             deltaX = self.x[1]-self.x[0]
@@ -155,11 +157,10 @@ class Simulation():
             c_r = self.center_reduction/100
 
             # Time steps
-            dtmaxtimefactor = 50 #TODO: meaning?
+            dtmaxtimefactor = 100 #50 #TODO: meaning?
             dtmax = deltaX**2/D 
             self.deltaT = dtmax/dtmaxtimefactor #factored out of diffusion equation... 
-            tmax = self.countermax*self.deltaT #ending time of simulation, used for solve_ivp
-
+            tmax = self.countermax*self.deltaT #ending time of simulation, used for solve_ivp (?)
         if self.dimension == 2:
             #ny = nx
             ny = self.shape[1] 
