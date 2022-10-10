@@ -146,7 +146,7 @@ class Simulation():
             nx = self.shape[0] # Number of points in simulation box
             #xmax = 50_000 # range of x #TODO: testing 1000x for nanometers instead of microns - larger dx = no numerical instability?
             #xmax = 250 #5x larger #NOTE: this didnt fix the numerical instability
-            xmax = 50 #default 
+            xmax = 50 #default (in microns)
             self.x = np.linspace(0, xmax, nx)
 
             deltaX = self.x[1]-self.x[0]
