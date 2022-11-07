@@ -64,7 +64,7 @@ class Simulation():
 
     #TODO implement starting from an arbtitrary initial condition ( to test low freq. spatial noise)
         #TODO implement starting from a saved run
-    def __init__(self, model=None, shape=(None,), method= "LSODA", atol= 1e-6, rtol= 1e-6, noisy=False, noise_stddev=0.01, layermax=0, nonstd_init=False, starting_ice=None, startingNtot=None):
+    def __init__(self, model=None, shape=(None,), method= "LSODA", atol= 1e-6, rtol= 1e-6, noisy=False, noise_stddev=0.01, layermax=0, nonstd_init=False, starting_ice=None, startingNtot=None, discretization_halt=True):
         """Initialize the Simulation
         Parameters
         ----------
@@ -84,6 +84,9 @@ class Simulation():
         self.atol = atol #default absolute tolerance 
         self.rtol = rtol #default relative tolerance
         self.shape = shape #shape of initial condition
+
+        # run-time arguments
+        self.discretization_halt = discretization_halt #whether to halt the simulation when the discretization limit is reached
 
         # make initial condition an attribute so it can be accessed for initialization in run()
         self.nonstd_init = nonstd_init
@@ -225,7 +228,7 @@ class Simulation():
         self._animation = None #matplotlib animation
         self._results = {None:None} #solve_ivp (-like) dictionary of results
         pass
-
+    
     def run(self, print_progress=True, print_count_layers=False, halve_time_res=False) -> None:
         """Runs the simulation and saves the results to the Simulation object. (self.results() to get the results)
         
@@ -243,6 +246,9 @@ class Simulation():
         if self._results != {None:None}:
             #already been run: tell plot/animation to update when called again since it is has been run again
             self._rerun = True
+
+        #discretization halt warning only triggers once
+        warningIssued = False
 
         if halve_time_res:
             #logic to only save every other time step
@@ -417,9 +423,12 @@ class Simulation():
 
                 #break if too many steps for discretization
                 if lastdiff > max(self.shape)//10:
-                    print('Warning: too many steps for discretization')
-                    break
-                
+                    if not warningIssued:
+                        print('Warning: too many steps for discretization')
+                        warningIssued = True
+                    if self.discretization_halt:
+                        break
+                    
                 lastlayer += 1
                 
             # Test whether we're finished

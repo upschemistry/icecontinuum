@@ -166,7 +166,8 @@ def getsigmastep(x,xmax,center_reduction,sigmastepmax):#,method='parabolic'):
         #if method == 'sinusoid':
         #    fsig = (np.cos(x/xmax*np.pi*2)+1)/2*(1-sigmapfac)+sigmapfac
         #elif method == 'parabolic':
-    fsig = (x-xmid)**2/xmid**2*(1-sigmapfac)+sigmapfac
+    fsig = (np.cos(x/xmax*np.pi*2)+1)/2*(1-sigmapfac)+sigmapfac #sinusoidal
+    #fsig = (x-xmid)**2/xmid**2*(1-sigmapfac)+sigmapfac #parabolic
     #except:
     #    print('bad method')
     return fsig*sigmastepmax
