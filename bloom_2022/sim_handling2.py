@@ -448,6 +448,8 @@ class Simulation():
                         print('breaking because reached max number of layers ablated')
                         break
             else:
+                prog = round((counter/self.countermax)*100, 2)
+                print("appx progress:" , prog,"%",end="\r")
                 if counter > self.countermax-1:
                     print('breaking because reached max number of iterations')
                     break
@@ -632,10 +634,13 @@ class Simulation():
                 ax = plt.axes()
                 ax.set_xlabel(r'x ($\mu m$)')
                 ax.set_ylabel('Layers of ice')
+
                 #plt.xlim(min(self.x-0.5), max(self.x+0.5))
                 
                 def update_fig(num):
                     ax.clear()
+                    ax.set_xlabel(r'x ($\mu m$)')
+                    ax.set_ylabel('Layers of ice')
                     #ax.draw()
                     #ax.set_ylim(min(Nice[num]-0.5), max(Ntot[num]+0.5))
                     if ice:
@@ -650,6 +655,7 @@ class Simulation():
                         #ax.set_ylim(min(Fliq[num]-0.5), max(Ntot[num]+0.5))
                     ax.set_xlim(min(self.x-0.5), max(self.x+0.5))
                     ax.set_ylim(np.min(Nice[num]-0.5), np.max(Ntot[num]+0.5))
+                    
                     pass
                 plt.legend()
             elif self.dimension == 2: 
@@ -673,6 +679,9 @@ class Simulation():
                 #labels
                 def update_fig(num):
                     ax.clear() # remove last iteration of plot 
+                    ax.set_xlabel(r'$x (\mu m$)')#,fontsize=fontsize)
+                    ax.set_ylabel(r'$y (\mu m$)')#,fontsize=fontsize)
+                    ax.set_zlabel(r'$ice \ layers$')#,fontsize=fontsize)
                     #limits
                     if focus_on_growth: #stay zoomed on new growth
                         ax.set_zlim3d(np.min(Nice[num]-0.5), np.max(Nice[num]+1.5)) 

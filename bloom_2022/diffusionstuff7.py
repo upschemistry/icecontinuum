@@ -136,8 +136,8 @@ def diffuse_1d(Fliq0,DoverdeltaX2):
         dy[l-1] = DoverdeltaX2*(Fliq0[0]-2*Fliq0[l-1]+Fliq0[l-2])
     return dy
 
-@njit("f8[:](f8,f8[:],f8[:],i4[:],f8[:])",parallel=prll_1d)#slower with paralellization right now
-def f1d(t, y, float_params, int_params, sigmastep): #sigmastep is an array
+@njit("f8[:](f8[:],f8,f8[:],i4[:],f8[:])",parallel=prll_1d)#slower with paralellization right now
+def f1d(y,t,  float_params, int_params, sigmastep): #sigmastep is an array
     """ odeint function for the one-dimensional ice model """
      # unpack parameters
     Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
@@ -223,9 +223,12 @@ def f2d(t, y, float_params, int_params, sigmastep):
     Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
     niter, nx, ny = int_params
 
+    # print('shape of y', y.shape)
+    # print('y:', y)
+
     # unpack current values of y
-    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(types.int32(2),types.int32(nx),types.int32(ny)))
-    
+    y = np.reshape(np.ascontiguousarray(y),(2,nx,ny))#(types.int32(2),types.int32(nx),types.int32(ny)))
+    Fliq0, Ntot0 = y[0,:,:], y[1,:,:]
     # Deposition
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
     #print('Fliq0: ', Fliq0)
@@ -248,6 +251,7 @@ def f2d(t, y, float_params, int_params, sigmastep):
 
     # Package for output
     derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx*ny)
+    #print('derivs shape: ',derivs.shape)
     return derivs
 
 @njit(float64[:](float64[:],float64,float64,float64))#,types.unicode_type))
