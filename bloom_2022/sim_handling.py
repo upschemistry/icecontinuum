@@ -618,7 +618,7 @@ class Simulation():
                         ax.plot(self.x, Ntot[num], 'b', label='ice+QLL')
                         #ax.set_ylim(min(Fliq[num]-0.5), max(Ntot[num]+0.5))
                     ax.set_xlim(min(self.x-0.5), max(self.x+0.5))
-                    ax.set_ylim(np.min(Nice[num]-0.5), np.max(Ntot[num]+0.5))
+                    ax.set_ylim(np.min(Nice[num]-0.5), np.max(Nice[num]+1.5))
                     pass
                 plt.legend()
             elif self.dimension == 2: 
