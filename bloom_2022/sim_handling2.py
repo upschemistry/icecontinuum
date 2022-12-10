@@ -254,7 +254,7 @@ class Simulation():
             #logic to only save every other time step
             flop = False #starts as false to not save the second time step, since the first is always saved
         
-        #unpack parameters
+        #unpack parameters, based on dimension
         if self.dimension >= 0:
             Nbar = self.float_params['Nbar']
             Nstar = self.float_params['Nstar']
@@ -424,9 +424,10 @@ class Simulation():
                 #break if too many steps for discretization
                 if lastdiff > max(self.shape)//10:
                     if not warningIssued:
-                        print('Warning: too many steps for discretization')
+                        print('Warning: too many steps for discretization after', minpoint, 'layers grown')
                         warningIssued = True
                     if self.discretization_halt:
+                        print('Halting due to lack of discretization')
                         break
                     
                 lastlayer += 1
@@ -654,7 +655,7 @@ class Simulation():
                         ax.plot(self.x, Ntot[num], 'b', label='ice+QLL')
                         #ax.set_ylim(min(Fliq[num]-0.5), max(Ntot[num]+0.5))
                     ax.set_xlim(min(self.x-0.5), max(self.x+0.5))
-                    ax.set_ylim(np.min(Nice[num]-0.5), np.max(Ntot[num]+0.5))
+                    ax.set_ylim(np.min(Nice[num]-0.5), np.max(Nice[num]+1.5))
                     
                     pass
                 plt.legend()
