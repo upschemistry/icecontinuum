@@ -61,7 +61,7 @@ class Simulation():
 
     #TODO implement starting from an arbtitrary initial condition ( to test low freq. spatial noise)
         #TODO implement starting from a saved run
-    def __init__(self, model=None, shape=(None,), method= "LSODA", atol= 1e-6, rtol= 1e-6, noisy=False, noise_stddev=0.01, layermax=0, nonstd_init=False, starting_ice=None, startingNtot=None):
+    def __init__(self, model=None, shape=(None,), method= "LSODA", atol= 1e-6, rtol= 1e-6, noisy=False, noise_stddev=0.01, layermax=0, nonstd_init=False, starting_ice=None, startingNtot=None, discretization_halt=True):
         """Initialize the Simulation
         Parameters
         ----------
@@ -82,6 +82,9 @@ class Simulation():
         self.rtol = rtol #default relative tolerance
         self.shape = shape #shape of initial condition
 
+        # run-time arguments
+        self.discretization_halt = discretization_halt #whether to halt the simulation when the discretization limit is reached
+        
         # make initial condition an attribute so it can be accessed for initialization in run()
         self.nonstd_init = nonstd_init
         self.starting_ice = starting_ice
@@ -240,6 +243,9 @@ class Simulation():
             #already been run: tell plot/animation to update when called again since it is has been run again
             self._rerun = True
 
+        #discretization halt warning only triggers once
+        warningIssued = False
+
         if halve_time_res:
             #logic to only save every other time step
             flop = False #starts as false to not save the second time step, since the first is always saved
@@ -282,6 +288,18 @@ class Simulation():
                 # Initialize with noise
                 noise = np.random.normal(0,self.noise_std_dev,self.shape)
                 Nice += noise
+            if self.dimension == 0:
+                #sigma = sigmastepmax
+                model_args = (packed_float_params,niter)
+                nliq_func = ds.getNliq # function to get to update fliq
+            elif self.dimension == 1:
+                sigma = ds.getsigmastep(self.x, np.max(self.x), self.center_reduction, self.sigmastepmax)
+                model_args = (packed_float_params,packed_int_params,sigma)
+                nliq_func = ds.getNliq_array # function to get to update fliq
+            elif self.dimension == 2:
+                sigma = ds.getsigmastep_2d(self.x,self.y, self.center_reduction, self.sigmastepmax) # supersaturation
+                model_args = (packed_float_params,packed_int_params,sigma) 
+                nliq_func = ds.getNliq_2d_array # function to get to update fliq
         else:
             # Lay out the initial system
             Nice = np.ones(self.shape)
@@ -402,8 +420,12 @@ class Simulation():
 
                 #break if too many steps for discretization
                 if lastdiff > max(self.shape)//10:
-                    print('Warning: too many steps for discretization')
-                    break
+                    if not warningIssued:
+                        print('Warning: too many steps for discretization after', minpoint, 'layers grown')
+                        warningIssued = True
+                    if self.discretization_halt:
+                        print('Halting due to lack of discretization')
+                        break
                 
                 lastlayer += 1
                 
