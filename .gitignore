@@ -147,3 +147,9 @@ bloom_2022/f2d_simulation_asymmetric250_200_1000layers_center_reduction0.1_D_2_R
 bloom_2022/09-11-2022_2D_growht_faceted_attempt_400layers.mp4
 bloom_2022/Nss_over_time_reproducing_orig.png
 bloom_2022/ending surface.png
+bloom_2022/c_r_vs_sigma.html
+bloom_2022/D_vs_sigma.html
+bloom_2022/Nss_vs_sigma.html
+bloom_2022/Number of steps over time_ds7.png
+.gitignore
+bloom_2022/ending surface_ds7.png
