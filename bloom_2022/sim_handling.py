@@ -141,11 +141,19 @@ class Simulation():
         t0 = 0.0 #start at time = 0
         if self.dimension == 0:
             self.deltaT = 1.0040120320801924 #NOTE/TODO: in continuum_model it was using the 1d deltaT for the 0d simulation
+        
+        discretization = 0.1 #microns per point
 
         if self.dimension > 0:
             nx = self.shape[0] # Number of points in simulation box
-            xmax = 50 # range of x
-            self.x = np.linspace(0, xmax, nx)
+            #print(type(nx))
+            
+            xmax = discretization * nx # consistent discretization of 10 points per micron
+            #print(type(xmax))
+            self.x = np.arange(0, xmax, discretization)
+            #xmax = 50 # range of x
+            #self.x = np.linspace(0, xmax, nx)
+
 
             deltaX = self.x[1]-self.x[0]
             DoverdeltaX2 = D/deltaX**2 # Diffusion coefficient scaled for this time-step and space-step
@@ -163,8 +171,10 @@ class Simulation():
         if self.dimension == 2:
             #ny = nx
             ny = self.shape[1] 
-            ymax = round(xmax * ny/nx)
-            self.y = np.linspace(0, ymax, ny)
+            ymax = discretization * ny
+            #ymax = round(xmax * ny/nx)
+            self.y = np.arange(0, ymax, discretization)
+            #self.y = np.linspace(0, ymax, ny)
 
             deltaY = self.y[1]-self.y[0]
             DoverdeltaY2 = D/deltaY**2 #unused           
@@ -308,7 +318,7 @@ class Simulation():
                 noise = np.random.normal(0,self.noise_std_dev,self.shape)
                 Nice += noise
             if self.dimension == 0:
-                Fliq = Nbar#ds.getNliq(Nice,Nstar,Nbar,niter) fliq updates to this but starts as nbar
+                Fliq = Nbar #ds.getNliq(Nice,Nstar,Nbar,niter) fliq updates to this but starts as nbar
                 #sigma = sigmastepmax
                 model_args = (packed_float_params,niter)
                 nliq_func = ds.getNliq # function to get to update fliq
@@ -364,7 +374,7 @@ class Simulation():
                 #y = y[1]
             else:
                 method = self.method
-            solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method=self.method, args=model_args, t_eval=self.tinterval, rtol=self.rtol, atol=self.atol)
+                solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method=self.method, args=model_args, t_eval=self.tinterval, rtol=self.rtol, atol=self.atol)
         
             y = solve_ivp_result.y[:, len(solve_ivp_result.t)-1]#y[:,-1] : get last timestep that solve_ivp returns
             

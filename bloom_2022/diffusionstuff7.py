@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Tue Jul 14 15:01:47 2015
 
@@ -144,7 +143,7 @@ def f1d(t, y,  float_params, int_params, sigmastep): #sigmastep is an array
     niter, nx = int_params
 
     # unpack current values of y
-    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(types.int32(2),types.int32(nx)))
+    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y), (types.int32(2),types.int32(nx)))
     
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
     sigD = (sigmastep - delta * sigma0)/(1+delta*sigma0)
