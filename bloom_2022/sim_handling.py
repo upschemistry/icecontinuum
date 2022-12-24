@@ -103,7 +103,7 @@ class Simulation():
         nmpermonolayer = 0.3 #Thickness of a monolayer of ice #TODO: From MD, 2016 paper?  Sazaki et al. said 0.34 nm per monolayer
         umpersec_over_mlyperus = (nmpermonolayer/1e3*1e6)# Conversion of nanometers per monolayer to micron/sec over monolayers/microsecond
         nu_kin = 49 # microns/second #TODO: citation? 
-        deprate = nu_kin/umpersec_over_mlyperus # monolayers per microsecond # Deposition rate
+        deprate = nu_kin/umpersec_over_mlyperus # bilayers? per microsecond # Deposition rate
         # deprate_times_deltaT = deprate * self.deltaT #unused
         # Supersaturation
         self.sigma0 = 0.19
