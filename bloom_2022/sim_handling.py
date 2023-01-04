@@ -1,3 +1,5 @@
+import cProfile
+import pstats
 from ctypes import py_object
 from math import floor
 import numpy as np
@@ -312,7 +314,10 @@ class Simulation():
                 nliq_func = ds.getNliq_2d_array # function to get to update fliq
         else:
             # Lay out the initial system
-            Nice = np.ones(self.shape)
+            if self.dimension == 0:
+                Nice = 1
+            else:
+                Nice = np.ones(self.shape)
             if self.noisy_init:
                 # Initialize with noise
                 noise = np.random.normal(0,self.noise_std_dev,self.shape)
@@ -443,9 +448,9 @@ class Simulation():
             if self.uselayers:
                 if print_progress:
                     if self.sigmastepmax <0:
-                        prog = round((-1*layer/(self.layermax-1))*100, 2)
+                        prog = round(-1* layer/(self.layermax-1)*100, 2)
                     else:
-                        prog = round((layer/(self.layermax-1))*100, 2)
+                        prog = round(layer/(self.layermax-1)*100, 2)
                     print("appx progress:" , prog,"%",end="\r")
                 if self.sigmastepmax > 0:
                     if layer > self.layermax-1:
@@ -888,23 +893,30 @@ def loadSim(filename: str) -> py_object:
 """
 Performance testing functions for the ice model.
 """
-#Meta testing parameters
 def multiple_test_avg_time(func, args=None, n_tests = 50):
     """
-    Test a function n_tests times and return the average time taken for the function.
+    Test a function n_tests times and return the average time taken for the function,
+    as well as the profile statistics.
     """
     times = []
     for i in range(n_tests):
+        # Create a Profile object
+        pr = cProfile.Profile()
+
+        # Run the function and create the profile data
         start = np.float64(time.time())
         if args == None:
-            func()
+            pr.runcall(func)
         else:
-            func(*args)
+            pr.runcall(func, *args)
         times.append(time.time()-start)
+
+        # Create a Stats object
+        stats = pstats.Stats(pr)
 
     avg_time_taken = float(np.mean(times))
     print("Time to run "+str(func.__name__)+" on average for "+ str(n_tests) +" tests: ", avg_time_taken, "seconds")
-    return avg_time_taken
+    return stats, avg_time_taken
 
 
 # idea for a function but ?????
