@@ -106,8 +106,8 @@ def getdNliq_dNtot_2d_array(Ntot,Nstar,Nbar,niter):
         fqll_last = fqll_next_2d_array(fqll_last,Ntot,Nstar,Nbar)
     return dfqll_dNtot_last*Nbar 
 
-@njit("f8[:](f8[:],f8,f8[:],i4)")
-def f0d(y, t, float_params, niter):
+@njit("f8[:](f8,f8[:],f8[:],i4)")
+def f0d(t, y, float_params, niter):
     """ odeint function for the zero-dimensional ice model """
     Nbar, Nstar, sigmastepmax, sigma0, deprate = float_params  # unpack parameters
     
