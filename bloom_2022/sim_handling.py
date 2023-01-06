@@ -181,7 +181,7 @@ class Simulation():
             deltaY = self.y[1]-self.y[0]
             DoverdeltaY2 = D/deltaY**2 #unused           
         #self.tinterval = [t0, tmax] #this is for solve_ivp
-        self.tinterval = [t0, self.deltaT] #this is for odeint
+        self.tinterval = [t0, self.deltaT] #this is for odeint/ step by step solve ivp integration
 
         #Save variables not used in model via self.* to an array for saving
         self._extra_vars = {
@@ -366,13 +366,13 @@ class Simulation():
         while True:
             # Integrate up to next time step 
             
+            #print(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), self.method,model_args, self.rtol, self.atol)
             if self.method == 'odeint':
-                method = 'RK45'
                 solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method='RK45', args=model_args, rtol=self.rtol, atol=self.atol)#, t_eval=self.tinterval)
                 y = solve_ivp_result.y[:, len(solve_ivp_result.t)-1]#y[:,-1] : get last timestep that solve_ivp returns
             else:
-                method = self.method
-                solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method=self.method, args=model_args, t_eval=self.tinterval, rtol=self.rtol, atol=self.atol)
+                #old version: solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method=self.method, args=model_args, t_eval=self.tinterval, rtol=self.rtol, atol=self.atol)
+                solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method=self.method, args=model_args, rtol=self.rtol, atol=self.atol)
         
             y = solve_ivp_result.y[:, len(solve_ivp_result.t)-1]#y[:,-1] : get last timestep that solve_ivp returns
             
