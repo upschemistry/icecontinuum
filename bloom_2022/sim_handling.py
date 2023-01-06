@@ -1,4 +1,5 @@
 import cProfile
+import os
 import pstats
 from ctypes import py_object
 from math import floor
@@ -10,6 +11,7 @@ from copy import copy as dup
 from scipy.integrate import odeint
 from scipy.integrate import solve_ivp
 from numba.types import int64,int32
+import psutil
 
 #for animations
 import matplotlib.animation as animation
@@ -63,7 +65,7 @@ class Simulation():
 
     #TODO implement starting from an arbtitrary initial condition ( to test low freq. spatial noise)
         #TODO implement starting from a saved run
-    def __init__(self, model=None, shape=(None,), method= "LSODA", atol= 1e-6, rtol= 1e-6, noisy=False, noise_stddev=0.01, layermax=0, nonstd_init=False, starting_ice=None, startingNtot=None, discretization_halt=True):
+    def __init__(self, model=None, shape=(None,), method= "LSODA", atol= 1e-6, rtol= 1e-6, noisy=False, noise_stddev=0.01, layermax=0, nonstd_init=False, starting_ice=None, startingNtot=None, discretization_halt=True, mem_check=False, mem_threshold = 100E9, name="simulation"):
         """Initialize the Simulation
         Parameters
         ----------
@@ -86,6 +88,9 @@ class Simulation():
 
         # run-time arguments
         self.discretization_halt = discretization_halt #whether to halt the simulation when the discretization limit is reached
+        self.mem_check = mem_check #whether to write to files to manage memory usage
+        self.memory_threshold = mem_threshold #default virutal memory remaining before halting simulation and saving to file before continuing
+        self.filename = name + '_save.npy'
         
         # make initial condition an attribute so it can be accessed for initialization in run()
         self.nonstd_init = nonstd_init
@@ -362,10 +367,23 @@ class Simulation():
         lastlayer = 0
         lastdiff = 0
 
+        if self.mem_check:
+            memcheckcounter = 0
         # Call the ODE solver
         while True:
             # Integrate up to next time step 
             
+            # Check the memory usage
+            if self.mem_check:
+                memcheckcounter += 1
+                if memcheckcounter % 4 == 0:
+                    #memory_usage = psutil.virtual_memory().used
+                    memory_usage = psutil.swap_memory().free
+                    if memory_usage <= self.memory_threshold:
+                        woa_to_file(self, self.filename)
+                        print('Memory usage exceeded threshold. Saving to file and halting.')
+                        return self.filename
+
             #print(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), self.method,model_args, self.rtol, self.atol)
             if self.method == 'odeint':
                 solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method='RK45', args=model_args, rtol=self.rtol, atol=self.atol)#, t_eval=self.tinterval)
@@ -922,3 +940,101 @@ def multiple_test_avg_time(func, args=None, n_tests = 50):
 #         sim.run()
 #         results_array[params] = sim.results()
 #     return results_array
+
+#functions to handle simulations too large to fit in memory
+
+def copy_sim(simulation: Simulation):
+    #copy simulation params
+    new_sim = Simulation(simulation.model, (simulation.shape[0],simulation.shape[1]), method=simulation.method, rtol=simulation.rtol)
+    new_sim.layermax = simulation.layermax
+    new_sim.float_params['DoverdeltaX2'] = simulation.float_params['DoverdeltaX2']
+    new_sim.sigma0 = simulation.sigma0
+    new_sim.sigmastepmax = simulation.sigmastepmax
+    new_sim.center_reduction = simulation.center_reduction
+    new_sim.noisy_init = simulation.noisy_init
+    #set up initial surface from ending step of last simulation
+    new_sim.nonstd_init = True
+    
+    return new_sim
+
+# def handle_mem_intense_sim(simulation: Simulation, filename: str):
+#     """ returns Ntot if it can, otherwise writes to file when memory runs out, then continues simulation from where it left off."""
+    
+#     if os.path.exists(filename):
+#         mode = 'a'  # Append to the file if it already exists
+#         start_from_last_step = True
+#     else:
+#         mode = 'w'  # Create a new file and write to it if it doesn't exist
+#         start_from_last_step = False
+
+#     try:
+#         if start_from_last_step:  
+#             #continue simulation
+#             new_sim = copy_sim(simulation)
+
+#             #load previous simulation last step from memory
+#             last_step = np.load(filename, mmap_mode='r', allow_pickle=True)[-1]
+
+#             new_sim.startingNtot = last_step[1]
+#             new_sim.starting_ice = last_step[1]-last_step[0]
+#             #run new simulation
+#             handle_mem_intense_sim(new_sim, filename)
+#         else:
+#             return simulation.getNtot() #i.e. test_2d_asym.getNtot()
+
+#     except MemoryError:
+#         print("Ran out of memory when trying to get Ntot. Writing results to file, and continuing simulation instead.")
+#         #print('shape of array being saved is: ', test_2d_asym.results()['y'].shape)
+
+#         #ys = np.array(simulation.results()['y'])
+#         #ys = simulation.results()['y'] #this is a list of arrays, so it is not a numpy array
+#         ys = np.asarray(simulation.results()['y']) #create view of list as numpy array
+
+#         #write to npy file
+#         if os.path.exists(filename):
+#             # Append the new data to the existing data along the first axis and then
+#             # Save the combined data to the file, overwriting the old data
+#             with open(filename, 'ab') as f:
+#                 #I am using allow pickle because the data is a list, but I don't want to
+#                 # use extra memory before saving by converting to an array first.
+#                 # When it is loaded it will be an array as desired.
+#                 #np.save(filename, ys, allow_pickle=True) 
+#                 np.save(filename, ys)
+#         else:
+#             #np.save(filename, ys, allow_pickle=True)
+#             np.save(filename, ys)
+
+#         #continue simulation
+#         new_sim = copy_sim(simulation)
+
+#         del simulation._results #remove results from memory
+
+#         #run new simulation
+#         handle_mem_intense_sim(new_sim, filename)
+
+#write or append the simulation results to a file
+def woa_to_file(simulation, filename):
+    if os.path.exists(filename):
+        mode = 'a'  # Append to the file if it already exists
+    else:
+        mode = 'w'  # Create a new file and write to it if it doesn't exist
+    
+    with open(filename, mode) as f:
+        #I am using allow pickle because the data is a list, but I don't want to
+        # use extra memory before saving by converting to an array first.
+        # When it is loaded it will be an array as desired.
+        np.save(f, simulation.results()['y'], allow_pickle=True)
+    pass
+
+def continue_from_file(simulation, filename):
+    #if path exists
+    if os.path.exists(filename):
+        last_step = np.load(filename, mmap_mode='r', allow_pickle=True)[-1]
+    else:
+        print('path does not exist')
+
+    new_sim = copy_sim(simulation)
+    new_sim.startingNtot = last_step[1]
+    new_sim.starting_ice = last_step[1]-last_step[0]
+
+    return new_sim
