@@ -289,8 +289,6 @@ class Simulation():
             #packed_float_params = np.array([Nbar, Nstar, sigma0, deprate, DoverdeltaX2])
             packed_int_params = np.array(list(map(int64,[niter,nx,ny]))) # sigmastep math in f2d in diffusionstuff7 requires int64
         
-    #nonstd_init=False, starting_ice=None, startingNtot=None
-
         if self.nonstd_init:
             #nonstandard initial conditions
             Nice = self.starting_ice
@@ -371,12 +369,7 @@ class Simulation():
             if self.method == 'odeint':
                 method = 'RK45'
                 solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method='RK45', args=model_args, rtol=self.rtol, atol=self.atol)#, t_eval=self.tinterval)
-                # print('ylast: ', ylast)
-                # print("shape of ylast: ", np.shape(ylast))
-                # print("np.prod(np.shape(ylast)): ", np.prod(np.shape(ylast)))
-                # y = odeint(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), args=model_args, rtol=self.rtol, atol=self.atol, tfirst=True)
                 y = solve_ivp_result.y[:, len(solve_ivp_result.t)-1]#y[:,-1] : get last timestep that solve_ivp returns
-                #y = y[1]
             else:
                 method = self.method
                 solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method=self.method, args=model_args, t_eval=self.tinterval, rtol=self.rtol, atol=self.atol)
@@ -479,7 +472,6 @@ class Simulation():
         if step == None:
             Fliq = []
             for i in range(len(self.results()['t'])):
-                #next_Fliq, next_Ntot = self.results()['y'][i]
                 next_Fliq = self.results()['y'][i][0]
                 #normalize results
                 Fliq.append(next_Fliq)
@@ -491,7 +483,6 @@ class Simulation():
         if step == None:
             Ntot = []
             for step in range(len(self.results()['t'])):
-                #next_Fliq, next_Ntot = self.results()['y'][step]
                 next_Ntot = self.results()['y'][step][1]
                 #normalize results
                 Ntot.append(next_Ntot)
