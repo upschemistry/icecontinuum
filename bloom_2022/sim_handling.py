@@ -8,7 +8,6 @@ from matplotlib import pyplot as plt
 import time
 import diffusionstuff7 as ds
 from copy import copy as dup
-from scipy.integrate import odeint
 from scipy.integrate import solve_ivp
 from numba.types import int64,int32
 import psutil
@@ -376,10 +375,10 @@ class Simulation():
             # Check the memory usage
             if self.mem_check:
                 memcheckcounter += 1
-                if memcheckcounter % 4 == 0:
-                    #memory_usage = psutil.virtual_memory().used
+                if memcheckcounter % 4 == 0:# only check every 4 steps to save time checking memory
                     memory_usage = psutil.swap_memory().free
                     if memory_usage <= self.memory_threshold:
+                        #write or append to file
                         woa_to_file(self, self.filename)
                         print('Memory usage exceeded threshold. Saving to file and halting.')
                         return self.filename
@@ -1015,9 +1014,9 @@ def copy_sim(simulation: Simulation):
 #write or append the simulation results to a file
 def woa_to_file(simulation, filename):
     if os.path.exists(filename):
-        mode = 'a'  # Append to the file if it already exists
+        mode = 'ab'  # Append to the file if it already exists
     else:
-        mode = 'w'  # Create a new file and write to it if it doesn't exist
+        mode = 'wb'  # Create a new file and write to it if it doesn't exist
     
     with open(filename, mode) as f:
         #I am using allow pickle because the data is a list, but I don't want to
