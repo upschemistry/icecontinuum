@@ -158,8 +158,14 @@ def f1d(t, y,  float_params, int_params, sigmastep): #sigmastep is an array
     dNtot_dt += dy 
 
     # Package for output
-    #derivs = np.reshape(np.array([[*dFliq0_dt], [*dNtot_dt]]),2*nx) #need to unpack lists back into arrays of proper shape (2,nx) before reshaping
-    derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx)
+    #need to unpack lists back into arrays of proper shape (2,nx) before reshaping
+    #derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx)
+    
+    #Use a view instead of a copy to reduce memory usage by avoiding a copy
+    derivs = np.empty(2*nx)
+    derivs[:nx] = dFliq0_dt
+    derivs[nx:] = dNtot_dt
+
     return derivs
 
 @njit(float64[:](float64,float64[:],float64,types.int64[:]), parallel=prll_2d)
