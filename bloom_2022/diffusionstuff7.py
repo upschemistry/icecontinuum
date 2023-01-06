@@ -125,14 +125,13 @@ def f0d(t, y, float_params, niter):
     return derivs
 
 @njit("f8[:](f8[:],f8)",parallel=prll_1d)
-def diffuse_1d(Fliq0,DoverdeltaX2):
+def diffuse_1d(Fliq0, DoverdeltaX2):
     l = len(Fliq0)
-    dy = np.zeros((l,))#np.shape(Fliq0))
-    for i in range(0,l):#(1,l-1):
-        dy[i] = DoverdeltaX2*(Fliq0[i+1]-2*Fliq0[i]+Fliq0[i-1])
-        # Boundary Conditions (periodic at ends)
-        dy[0] = DoverdeltaX2*(Fliq0[1]-2*Fliq0[0]+Fliq0[l-1]) 
-        dy[l-1] = DoverdeltaX2*(Fliq0[0]-2*Fliq0[l-1]+Fliq0[l-2])
+    dy = np.zeros((l,))
+    dy[1:-1] = DoverdeltaX2 * (Fliq0[:-2] - 2 * Fliq0[1:-1] + Fliq0[2:])
+    #boundary conditions
+    dy[0] = DoverdeltaX2*(Fliq0[1]-2*Fliq0[0]+Fliq0[l-1])
+    dy[l-1] = DoverdeltaX2*(Fliq0[0]-2*Fliq0[l-1]+Fliq0[l-2])
     return dy
 
 @njit("f8[:](f8,f8[:],f8[:],i4[:],f8[:])",parallel=prll_1d)#slower with paralellization right now
