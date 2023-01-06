@@ -193,29 +193,53 @@ def diffuse_2d(t,y,D,shape):
         The change to the thickness of the liquid at each point in the 2d area over
          the time step
     """
-    Fliq0 = y
     m,n = shape
-    Fliq0 = np.reshape(np.ascontiguousarray(Fliq0),(m,n)) #reshaping required for odeint/solve_ivp
-    #Fliq0 = np.reshape(Fliq0,(m,n)) #reshaping required for odeint/solve_ivp
-    dy = np.zeros((m,n)) 
-   
-    for i in range(0,m): #go from left column to right
-        for j in range(0,n): #go from top row to bottom
-            ip1=i+1 #i plus one
-            jp1=j+1
-            # Boundary Conditions (periodic at ends)
-            if i == m-1: #take care of right column condition wrapping to left edge
-                ip1 = 0
-            if j == n-1: #take care of bottom edge wrapping to top edge
-                jp1 = 0
+    Fliq0 = np.reshape(np.ascontiguousarray(y),(m,n))
+    dy = np.zeros((m,n))
 
-            ux = (Fliq0[ip1,j] - 2*Fliq0[i,j] + Fliq0[i-1,j])
-            uy = (Fliq0[i,jp1] - 2*Fliq0[i,j] + Fliq0[i,j-1])
+    # Calculate derivatives in the interior
+    dy[1:-1, 1:-1] = (
+        D * (Fliq0[:-2, 1:-1] - 2 * Fliq0[1:-1, 1:-1] + Fliq0[2:, 1:-1])
+        + D * (Fliq0[1:-1, :-2] - 2 * Fliq0[1:-1, 1:-1] + Fliq0[1:-1, 2:])
+    )
 
-            dy[i,j] = D*(ux+uy)
-    #dy = diffuse_vector_helper(Fliq0,dy,D)
-            
-    return np.reshape(dy,(m*n))
+    # Handle periodic boundary conditions
+    #Edges
+    dy[0, 1:-1] = (
+        D * (Fliq0[-1, 1:-1] - 2 * Fliq0[0, 1:-1] + Fliq0[1, 1:-1])
+        + D * (Fliq0[0, :-2] - 2 * Fliq0[0, 1:-1] + Fliq0[0, 2:])
+    )
+    dy[-1, 1:-1] = (
+        D * (Fliq0[-2, 1:-1] - 2 * Fliq0[-1, 1:-1] + Fliq0[0, 1:-1])
+        + D * (Fliq0[-1, :-2] - 2 * Fliq0[-1, 1:-1] + Fliq0[-1, 2:])
+    )
+    dy[1:-1, 0] = (
+    D * (Fliq0[:-2, 0] - 2 * Fliq0[1:-1, 0] + Fliq0[2:, 0])
+    + D * (Fliq0[1:-1, -1] - 2 * Fliq0[1:-1, 0] + Fliq0[1:-1, 1])
+    )
+    dy[1:-1, -1] = (
+        D * (Fliq0[:-2, -1] - 2 * Fliq0[1:-1, -1] + Fliq0[2:, -1])
+        + D * (Fliq0[1:-1, -2] - 2 * Fliq0[1:-1, -1] + Fliq0[1:-1, 0])
+    )
+    #Corners
+    dy[0, 0] = (
+    D * (Fliq0[-1, 0] - 2 * Fliq0[0, 0] + Fliq0[1, 0])
+    + D * (Fliq0[0, -1] - 2 * Fliq0[0, 0] + Fliq0[0, 1])
+    )
+    dy[-1, 0] = (
+        D * (Fliq0[-2, 0] - 2 * Fliq0[-1, 0] + Fliq0[0, 0])
+        + D * (Fliq0[-1, -1] - 2 * Fliq0[-1, 0] + Fliq0[-1, 1])
+    )
+    dy[0, -1] = (
+        D * (Fliq0[-1, -1] - 2 * Fliq0[0, -1] + Fliq0[1, -1])
+        + D * (Fliq0[0, -2] - 2 * Fliq0[0, -1] + Fliq0[0, 0])
+    )
+    dy[-1, -1] = (
+        D * (Fliq0[-2, -1] - 2 * Fliq0[-1, -1] + Fliq0[0, -1])
+        + D * (Fliq0[-1, -2] - 2 * Fliq0[-1, -1] + Fliq0[-1, 0])
+    )
+
+    return dy.flatten()
 
 @njit("f8[:](f8,f8[:],f8[:],i8[:],f8[:,:])",parallel=prll_2d) #NOTE: t and y swapped for solve_ivp compatability
 def f2d(t, y, float_params, int_params, sigmastep):
@@ -231,8 +255,7 @@ def f2d(t, y, float_params, int_params, sigmastep):
     # print('y:', y)
 
     # unpack current values of y
-    y = np.reshape(np.ascontiguousarray(y),(2,nx,ny))#(types.int32(2),types.int32(nx),types.int32(ny)))
-    Fliq0, Ntot0 = y[0,:,:], y[1,:,:]
+    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(2,nx,ny))#(types.int32(2),types.int32(nx),types.int32(ny)))
     # Deposition
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
     #print('Fliq0: ', Fliq0)
@@ -248,13 +271,19 @@ def f2d(t, y, float_params, int_params, sigmastep):
 
     # if diffusion:
     # Diffusion
-    dy =  np.reshape(np.ascontiguousarray( diffuse_2d(t, np.reshape(np.ascontiguousarray(Fliq0),nx*ny), DoverdeltaX2, np.array((nx,ny))) ),  (nx,ny))
+    dy =  np.reshape(np.ascontiguousarray( diffuse_2d(t, np.reshape(np.ascontiguousarray(Fliq0),nx*ny), DoverdeltaX2, np.array((nx,ny))) ), (nx,ny))
     # Combined
     dFliq0_dt += dy
     dNtot_dt += dy
 
     # Package for output
     derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx*ny)
+    #use a view to reduce memory usage by avoiding a copy
+    #NOTE: this does not work with parallelization
+    # derivs = np.empty(2*nx*ny)
+    # derivs[:nx*ny] = dFliq0_dt
+    # derivs[nx*ny:] = dNtot_dt
+
     #print('derivs shape: ',derivs.shape)
     return derivs
 
