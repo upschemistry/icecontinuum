@@ -376,8 +376,8 @@ class Simulation():
             if self.mem_check:
                 memcheckcounter += 1
                 if memcheckcounter % 4 == 0:# only check every 4 steps to save time checking memory
-                    memory_usage = psutil.swap_memory().free
-                    if memory_usage <= self.memory_threshold:
+                    memory_available = psutil.swap_memory().free
+                    if memory_available <= self.memory_threshold:
                         #write or append to file
                         woa_to_file(self, self.filename)
                         print('Memory usage exceeded threshold. Saving to file and halting.')
@@ -471,6 +471,9 @@ class Simulation():
                         print('breaking because reached max number of layers ablated')
                         break
             else:
+                if print_progress:
+                    prog = round(counter/(self.countermax)*100, 2)
+                    print("appx progress:" , prog,"%",end="\r")
                 if counter > self.countermax-1:
                     print('breaking because reached max number of iterations')
                     break
@@ -951,8 +954,13 @@ def copy_sim(simulation: Simulation):
     new_sim.sigmastepmax = simulation.sigmastepmax
     new_sim.center_reduction = simulation.center_reduction
     new_sim.noisy_init = simulation.noisy_init
-    #set up initial surface from ending step of last simulation
+    
     new_sim.nonstd_init = True
+    new_sim.uselayers = simulation.uselayers
+    new_sim.countermax = simulation.countermax
+    new_sim.discretization_halt = simulation.discretization_halt
+    new_sim.mem_check = simulation.mem_check
+    new_sim.filename = simulation.filename
     
     return new_sim
 
