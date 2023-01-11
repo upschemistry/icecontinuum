@@ -947,7 +947,7 @@ def multiple_test_avg_time(func, args=None, n_tests = 50):
 
 def copy_sim(simulation: Simulation):
     #copy simulation params
-    new_sim = Simulation(simulation.model, (simulation.shape[0],simulation.shape[1]), method=simulation.method, rtol=simulation.rtol)
+    new_sim = Simulation(simulation.model, simulation.shape, method=simulation.method, rtol=simulation.rtol)
     new_sim.layermax = simulation.layermax
     new_sim.float_params['DoverdeltaX2'] = simulation.float_params['DoverdeltaX2']
     new_sim.sigma0 = simulation.sigma0
@@ -1022,10 +1022,17 @@ def copy_sim(simulation: Simulation):
 #write or append the simulation results to a file
 def woa_to_file(simulation, filename):
     if os.path.exists(filename):
-        mode = 'ab'  # Append to the file if it already exists
-    else:
-        mode = 'wb'  # Create a new file and write to it if it doesn't exist
-    
+        #results_existing = np.load(filename, mmap_mode='r', allow_pickle=True)
+        results_existing = np.load(filename, allow_pickle=True)
+        #with open(filename, 'wb') as f:
+        
+        np.save(filename, np.concatenate((results_existing, simulation.results()['y']), axis=0))
+        pass
+        #mode = 'ab'  # Append to the file if it already exists
+    #else:
+    #    mode = 'wb'  # Create a new file and write to it if it doesn't exist
+    mode = 'wb'  # Create a new file and write to it if it doesn't exist
+
     with open(filename, mode) as f:
         #I am using allow pickle because the data is a list, but I don't want to
         # use extra memory before saving by converting to an array first.
@@ -1040,6 +1047,9 @@ def continue_from_file(simulation, filename):
     else:
         print('path does not exist')
 
+    return continue_from_surface(simulation, last_step)
+
+def continue_from_surface(simulation,last_step):
     new_sim = copy_sim(simulation)
     new_sim.startingNtot = last_step[1]
     new_sim.starting_ice = last_step[1]-last_step[0]
