@@ -148,7 +148,10 @@ class Simulation():
         if self.dimension == 0:
             self.deltaT = 1.0040120320801924 #NOTE/TODO: in continuum_model it was using the 1d deltaT for the 0d simulation
         
-        discretization = 0.1 #microns per point
+         
+        #discretization = 0.05 #microns per point 
+        discretization = 0.2 #microns per point 
+
 
         if self.dimension > 0:
             nx = self.shape[0] # Number of points in simulation box
@@ -383,6 +386,13 @@ class Simulation():
                         print('Memory usage exceeded threshold. Saving to file and halting.')
                         return self.filename
 
+            # Make some local copies, with possible updates to Fliq
+            Fliq, Ntot = ylast
+            if self.updatingFliq:
+                Fliq = nliq_func(Ntot,Nstar,Nbar,int32(niter)) # This updates to remove any drift
+                ylast[0] = Fliq
+            Nice = Ntot - Fliq
+
             #print(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), self.method,model_args, self.rtol, self.atol)
             if self.method == 'odeint':
                 solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method='RK45', args=model_args, rtol=self.rtol, atol=self.atol)#, t_eval=self.tinterval)
@@ -402,13 +412,7 @@ class Simulation():
                 ylast = np.reshape(y,(2,self.shape[0],self.shape[1])) 
             tlast += self.deltaT
             counter += 1
-            
-            # Make some local copies, with possible updates to Fliq
-            Fliq, Ntot = ylast
-            if self.updatingFliq:
-                Fliq = nliq_func(Ntot,Nstar,Nbar,int32(niter)) # This updates to remove any drift
-                ylast[0] = Fliq
-            Nice = Ntot - Fliq
+            #### where fliq was updated normally####
 
             #for calculating layers
             if self.dimension == 0:
@@ -1022,11 +1026,16 @@ def copy_sim(simulation: Simulation):
 #write or append the simulation results to a file
 def woa_to_file(simulation, filename):
     if os.path.exists(filename):
-        #results_existing = np.load(filename, mmap_mode='r', allow_pickle=True)
-        results_existing = np.load(filename, allow_pickle=True)
+        results_existing = np.load(filename, mmap_mode='r')#, allow_pickle=True)
+        #results_existing = np.load(filename)#, allow_pickle=True)
+
+        #results_existing = np.load(filename, allow_pickle=True)
         #with open(filename, 'wb') as f:
+        #copy to temporary different file to use disk space instead of memory, and allow memmapping of the exisitng results file
+        np.save('temp_'+filename, np.concatenate((results_existing, simulation.results()['y']), axis=0))
         
-        np.save(filename, np.concatenate((results_existing, simulation.results()['y']), axis=0))
+        # replace the exisitng file with the new file
+        os.replace('temp_'+filename,filename)#note: overwrites existing results with existing results + new results
         pass
         #mode = 'ab'  # Append to the file if it already exists
     #else:
@@ -1037,13 +1046,18 @@ def woa_to_file(simulation, filename):
         #I am using allow pickle because the data is a list, but I don't want to
         # use extra memory before saving by converting to an array first.
         # When it is loaded it will be an array as desired.
-        np.save(f, simulation.results()['y'], allow_pickle=True)
+        #np.save(f, simulation.results()['y'], allow_pickle=True)
+        np.save(f, simulation.results()['y'])
     pass
 
 def continue_from_file(simulation, filename):
     #if path exists
     if os.path.exists(filename):
-        last_step = np.load(filename, mmap_mode='r', allow_pickle=True)[-1]
+        #with open(filename,'rb') as f:
+            #last_step = np.load(f,mmap_mode='r',allow_pickle=True)[-1]
+        last_step = np.load(filename,mmap_mode='r')[-1]
+        #last_step = np.load(filename, mmap_mode='r', allow_pickle=True)[-1]
+        #last_step = np.load(filename, allow_pickle=True)[-1]
     else:
         print('path does not exist')
 
@@ -1053,5 +1067,5 @@ def continue_from_surface(simulation,last_step):
     new_sim = copy_sim(simulation)
     new_sim.startingNtot = last_step[1]
     new_sim.starting_ice = last_step[1]-last_step[0]
-
+    
     return new_sim
