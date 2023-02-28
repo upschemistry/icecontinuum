@@ -164,3 +164,10 @@ bloom_2022/__pycache__/diffusionstuff7.f2d-220.py39.nbi
 bloom_2022/__pycache__/**
 bloom_2022/long_2D_sim_500_500_pts.npy
 bloom_2022/zacc.npy
+bloom_2022/steady_state_ntot.npy
+bloom_2022/steady_state_ntot_1000.npy
+bloom_2022/heuristic_nss_results.npy
+bloom_2022/heuristic_last_step_results.npy
+bloom_2022/f2d_500_500_sigma0.444.npy
+bloom_2022/Eps_v_Omega_v_ending surface.png
+bloom_2022/Heuristic_instabilty_amp1.0_freq2.png
