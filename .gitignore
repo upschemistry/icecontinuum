@@ -171,3 +171,6 @@ bloom_2022/heuristic_last_step_results.npy
 bloom_2022/f2d_500_500_sigma0.444.npy
 bloom_2022/Eps_v_Omega_v_ending surface.png
 bloom_2022/Heuristic_instabilty_amp1.0_freq2.png
+bloom_2022/c_r_vs_sigma_3-10-2023.html
+bloom_2022/D_vs_sigma_3-10-2023.html
+bloom_2022/Nss_vs_nu_kin_3-10-2023.html
