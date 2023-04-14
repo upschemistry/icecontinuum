@@ -492,33 +492,36 @@ class Simulation():
             self.run()
         return self._results
 
-    def getFliq(self, step=None):# -> np.ndarray:
-        if step == None:
-            Fliq = []
-            for i in range(len(self.results()['t'])):
-                next_Fliq = self.results()['y'][i][0]
-                #normalize results
-                Fliq.append(next_Fliq)
-            return np.array(Fliq)
+    def getFliq(self, step=None) -> np.ndarray:
+        """
+        Returns the array of liquid thickness at each time step.
+        """
+        if step is None:
+            return np.asarray(self.results()['y'])[:, 0]
         else:
             return self.results()['y'][step][0]
         
     def getNtot(self, step=None) -> np.ndarray:
-        if step == None:
-            Ntot = []
-            for step in range(len(self.results()['t'])):
-                next_Ntot = self.results()['y'][step][1]
-                #normalize results
-                Ntot.append(next_Ntot)
-            return np.array(Ntot)
-        else:   
+        """
+        Returns the array of total surface area at each time step.
+        """
+        if step is None:
+            return np.asarray(self.results()['y'])[:, 1]
+        else:
             return self.results()['y'][step][1]
 
     def getNice(self, step=None) -> np.ndarray:
-        if step == None:
-            return self.getNtot() - self.getFliq()
+        """
+        Returns the array of ice thickness at each time step.
+        """
+        if step is None:
+            num_steps = len(self.results()['t'])
+            Nice = np.empty(num_steps, dtype=object)
+            for i in range(num_steps):
+                Nice[i] = np.subtract(self.getNtot(i), self.getFliq(i), out=self.getNtot(i).copy())
+            return Nice
         else:
-            return self.getNtot(step) - self.getFliq(step)
+            return np.subtract(self.getNtot(step), self.getFliq(step), out=self.getNtot(step).copy())
 
     def plot(self, completion=1, figurename='', ice=True, tot=False, liq=False, surface=True, contour=False):# -> matplotlib_figure: ## , method = 'surface'): #TODO: test plotting
         """ Plot the results of the simulation.
