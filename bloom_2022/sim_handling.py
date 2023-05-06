@@ -19,8 +19,8 @@ from matplotlib.animation import FuncAnimation, PillowWriter
 #for saving simulations
 import pickle
 
-"""This module describes a Simulation object that can be used to run simulations of the ice continuum;
-    as well as a function to test performance of functions.
+"""This module implements a Simulation object that can be used to run simulations of the ice continuum;
+    as well as functions to save, load, and continue a Simulation; and a function to test performance of functions.
     
     @Author: Max Bloom
         contact: mbloom@pugetsound.edu @mbloom0 on GitHub
@@ -503,7 +503,7 @@ class Simulation():
         
     def getNtot(self, step=None) -> np.ndarray:
         """
-        Returns the array of total surface area at each time step.
+        Returns the array of total ice and QLL thickness at each time step.
         """
         if step is None:
             return np.asarray(self.results()['y'])[:, 1]
@@ -516,7 +516,7 @@ class Simulation():
         """
         if step is None:
             num_steps = len(self.results()['t'])
-            Nice = np.empty(num_steps, dtype=object)
+            Nice = np.empty((num_steps, *self.shape), dtype=object)
             for i in range(num_steps):
                 Nice[i] = np.subtract(self.getNtot(i), self.getFliq(i), out=self.getNtot(i).copy())
             return Nice
