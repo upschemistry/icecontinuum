@@ -3,7 +3,7 @@ icecontinuum
 -------------
 
 Repository for Research students working on studying the nature of ice crystals with Steven Neshyba.
-*Collaborators: Jake Price, Max Bloom
+*Collaborators: Jake Price and Max Bloom
 
 The following types of files may be stored here:
 * Python Files and Corresponding Steady States
