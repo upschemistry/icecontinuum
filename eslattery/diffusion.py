@@ -36,14 +36,14 @@ prll_2d = True  # 2d faster with parallelization
 
 ## not working??
 @njit("f8[:](f8,f8[:],f8[:],i4)")
-def f0d(t, y, float_params, niter):
+def f0d(t, Ntot0, float_params, niter):
     """ odeint function for the zero-dimensional ice model (only source terms)"""
     Nbar, Nstar, sigmastepmax, sigma0, deprate = float_params  # unpack parameters
-    
-    Ntot0 = y[1]
+
+    x,y = Ntot0
 
     ## calc Fliq from Ntot
-    Fliq0 = 1 + Nstar/Nbar * np.sin(2*np.pi*(Ntot0 - Nbar)) 
+    Fliq0 = 1 + Nstar/Nbar * np.sin(2*np.pi*(x - Nbar)) 
 
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
     sigD = (sigmastepmax - delta * sigma0)/(1+delta*sigma0)
