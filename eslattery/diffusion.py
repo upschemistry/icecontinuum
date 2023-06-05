@@ -14,24 +14,48 @@ prll_2d = True  # 2d faster with parallelization
 
 
 
+# @njit("f8[:](f8,f8[:],f8[:],i4)")
+# def f0d(t, y, float_params, niter):
+#     """ odeint function for the zero-dimensional ice model (only source terms)"""
+#     Nbar, Nstar, sigmastepmax, sigma0, deprate = float_params  # unpack parameters
+    
+#     ## THIS LINE IS THE ERROR..
+#     Fliq0, Ntot0 = y   # unpack current values of y
+
+#     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
+#     sigD = (sigmastepmax - delta * sigma0)/(1+delta*sigma0)
+#     depsurf = deprate * sigD
+
+#     ## just replaced getdNliq_dNtot() with actual formula from paper in terms of Ntot
+#     dFliq0_dt = depsurf * Nstar * 2*np.pi*np.cos(2*np.pi*Ntot0)
+#     dNtot_dt = depsurf
+    
+#     derivs = np.array([dFliq0_dt, dNtot_dt])
+#     return derivs
+
+
+## not working??
 @njit("f8[:](f8,f8[:],f8[:],i4)")
 def f0d(t, y, float_params, niter):
     """ odeint function for the zero-dimensional ice model (only source terms)"""
     Nbar, Nstar, sigmastepmax, sigma0, deprate = float_params  # unpack parameters
     
-    Fliq0, Ntot0 = y   # unpack current values of y
+    Ntot0 = y[1]
+
+    ## calc Fliq from Ntot
+    Fliq0 = 1 + Nstar/Nbar * np.sin(2*np.pi*(Ntot0 - Nbar)) 
 
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
     sigD = (sigmastepmax - delta * sigma0)/(1+delta*sigma0)
     depsurf = deprate * sigD
 
-    ## just replaced getdNliq_dNtot() with actual formula from paper in terms of Ntot
-    dFliq0_dt = depsurf * Nstar * 2*np.pi*np.cos(2*np.pi*Ntot0)
+    ## replaced getdNliq_dNtot() with formula in terms of Ntot
     dNtot_dt = depsurf
     
-    derivs = np.array([dFliq0_dt, dNtot_dt])
+    derivs = np.array([dNtot_dt])
     return derivs
 
+## always worked, unchanged from diffusionstuff7
 @njit("f8[:](f8[:],f8)",parallel=prll_1d)
 def diffuse_1d(Fliq0, DoverdeltaX2):
     l = len(Fliq0)
@@ -44,15 +68,21 @@ def diffuse_1d(Fliq0, DoverdeltaX2):
     dy[l-1] = DoverdeltaX2*(Fliq0[0]-2*Fliq0[l-1]+Fliq0[l-2])
     return dy
 
+
 @njit("f8[:](f8,f8[:],f8[:],f8[:])",parallel=prll_1d)#slower with paralellization right now
-def f1d(t, Ntot,  float_params, sigmastep): #sigmastep is an array
-    """ odeint function for the one-dimensional ice model """
+def f1d(t, Ntot0,  float_params, sigmastep): #sigmastep is an array
+    """ odeint function for the one-dimensional ice model, calculates Fliq0 from Ntot
+    
+    Current version has implemented changes:
+        Replaced calls to diffusionstuff7.getdNliq_dNtot_array() with calculations of Fliq0 from Ntot0
+        Only takes Ntot0 values as an argument (rather than Fliq0 and Ntot0) 
+        Only returns dNtot_dt values (rather than dFliq_dt amd dNtot_dt)"""
     
     # unpack parameters
     Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
 
     ## Ntot is passed in, Fqll calculated from Ntot
-    Fliq0 = 1 + Nstar/Nbar * np.sin(2*np.pi*(Ntot - Nbar))
+    Fliq0 = 1 + Nstar/Nbar * np.sin(2*np.pi*(Ntot0 - Nbar))
 
     ## WHY??? still unsure about this one....
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
@@ -63,11 +93,10 @@ def f1d(t, Ntot,  float_params, sigmastep): #sigmastep is an array
 
     # Diffusion
     dy = diffuse_1d(Fliq0,DoverdeltaX2)
-    
     dNtot_dt += dy 
 
     ## Package for output, only values of dNtot
-    derivs = np.empty(len(Ntot))
+    derivs = np.empty(len(Ntot0))
     derivs[:] = dNtot_dt
     return derivs
 
@@ -147,41 +176,36 @@ def diffuse_2d(t,y,D,shape):
 
     return dy.flatten()
 
-## REPLACE THIS ONCE THE FUNCTION BELOW IT STARTS WORKING
+## getting errors (when used in solve_ivp)
 @njit("f8[:](f8,f8[:],f8[:],i8[:],f8[:,:])",parallel=prll_2d) #NOTE: t and y swapped for solve_ivp compatability
-def f2d(t, y, float_params, int_params, sigmastep):
+def f2d(t, Ntot0, float_params, int_params, sigmastep):
     """ 2D version of f1d """
 
     # diffusion = True
-
+    
     # unpack parameters
     Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
-    niter, nx, ny = int_params
+    nx, ny = int_params
 
 
     # unpack current values of y
-    Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y),(2,nx,ny))#(types.int32(2),types.int32(nx),types.int32(ny)))
+    Fliq0 = 1 + Nstar/Nbar * np.sin(2*np.pi*(Ntot0 - Nbar))
     # Deposition
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
     sigD = (sigmastep - delta * sigma0)/(1+delta*sigma0)
     depsurf = deprate * sigD
 
-    ## dFliq dt in terms of Ntot
-    dFliq0_dt = Nstar/Nbar * 2*np.pi * np.cos(2*np.pi*(Ntot0 - Nbar))
-
+    ## 
     dNtot_dt = depsurf
 
     # if diffusion:
     # Diffusion
-    dy =  np.reshape(np.ascontiguousarray( diffuse_2d(t, np.reshape(np.ascontiguousarray(Fliq0),nx*ny), DoverdeltaX2, np.array((nx,ny))) ), (nx,ny))
+    dy =  np.reshape(np.ascontiguousarray(diffuse_2d(t, np.reshape(np.ascontiguousarray(Fliq0),nx*ny), DoverdeltaX2, np.array((nx,ny)))), (nx,ny))
     # Combined
-    dFliq0_dt += dy
     dNtot_dt += dy
 
     # Package for output
-    derivs = np.reshape(np.stack((dFliq0_dt,dNtot_dt),axis=0),2*nx*ny)
-    #use a view to reduce memory usage by avoiding a copy
-    
+    derivs = dNtot_dt.flatten()    
     return derivs
 
 
