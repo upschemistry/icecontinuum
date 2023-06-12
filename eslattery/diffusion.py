@@ -1,63 +1,80 @@
 """
 Created on Tue Jul 14 15:01:47 2015
+Updated on Mon Jun 5 2023
 
-@author: THIS IS NEW nesh, jonathan, Max
+@author: nesh, jonathan, Max, Ella
 """
 
 import numpy as np
-#import math
 from numba import njit, float64, types#,guvectorize
 
 prll_1d = False # 1d faster without parallelization
 prll_2d = True  # 2d faster with parallelization
 
 
-
-
 # @njit("f8[:](f8,f8[:],f8[:],i4)")
 # def f0d(t, y, float_params, niter):
-#     """ odeint function for the zero-dimensional ice model (only source terms)"""
-#     Nbar, Nstar, sigmastepmax, sigma0, deprate = float_params  # unpack parameters
+#     """ odeint function for the zero-dimensional ice model (only source terms)
     
-#     ## THIS LINE IS THE ERROR..
-#     Fliq0, Ntot0 = y   # unpack current values of y
+#     Currently works, NOTE unless input y is changed to Ntot0. Fliq0 is
+#     immediately overwritten, but so far a solution cannot be found. 
+    
+#     Parameters
+#     ----------
+#     t : float
+#         The time step, placeholder for odeint
+#     y : 1d Numpy Array
+#         The first half of this array contains the initial nondimensionalized thickness
+#         of the qll layer. The second half contains initial dimensionalized thicknesses
+#         of qll and ice layers. 
+#     float_params : Dictionary
+#         TKey-value pairs mapping Nbar, Nstar, sigma0, deprate, DoverdeltaX2 to corresponding values
+#     niter : int
+#         NOTE Currently unused number of iterations (to be deleted soon)
+    
+#     Returns
+#     -------
+#     derivs : 1d Numpy Array
+#         The change to thickness of ice and qll layers at each point in the
+#         1d array over the time step
+#     """
+#     Nbar, Nstar, sigmastepmax, sigma0, deprate = float_params  # unpack parameters
+
+#     ## doesn't work if removed
+#     ## Fliq0 overwritten right after
+#     Fliq0, Ntot0 = y
+
+#     ## calc Fliq from Ntot
+#     Fliq0 = 1 + Nstar/Nbar * np.sin(2*np.pi*(Ntot0 - Nbar)) 
 
 #     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
 #     sigD = (sigmastepmax - delta * sigma0)/(1+delta*sigma0)
 #     depsurf = deprate * sigD
 
-#     ## just replaced getdNliq_dNtot() with actual formula from paper in terms of Ntot
-#     dFliq0_dt = depsurf * Nstar * 2*np.pi*np.cos(2*np.pi*Ntot0)
+#     ## replaced getdNliq_dNtot() with formula in terms of Ntot
 #     dNtot_dt = depsurf
     
-#     derivs = np.array([dFliq0_dt, dNtot_dt])
+#     derivs = np.array([dNtot_dt])
 #     return derivs
-
-
-## not working??
-@njit("f8[:](f8,f8[:],f8[:],i4)")
-def f0d(t, Ntot0, float_params, niter):
-    """ odeint function for the zero-dimensional ice model (only source terms)"""
-    Nbar, Nstar, sigmastepmax, sigma0, deprate = float_params  # unpack parameters
-
-    x,y = Ntot0
-
-    ## calc Fliq from Ntot
-    Fliq0 = 1 + Nstar/Nbar * np.sin(2*np.pi*(x - Nbar)) 
-
-    delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
-    sigD = (sigmastepmax - delta * sigma0)/(1+delta*sigma0)
-    depsurf = deprate * sigD
-
-    ## replaced getdNliq_dNtot() with formula in terms of Ntot
-    dNtot_dt = depsurf
-    
-    derivs = np.array([dNtot_dt])
-    return derivs
 
 ## always worked, unchanged from diffusionstuff7
 @njit("f8[:](f8[:],f8)",parallel=prll_1d)
 def diffuse_1d(Fliq0, DoverdeltaX2):
+    """ Applies numerical solution to liquid to find diffusive effects in 1d
+
+    Parameters
+    ----------
+    Fliq0 : 1d Numpy Array
+        The thickness of the liquid over a 1D space
+    DoverdeltaX2 : float
+        TODO
+    
+    Returns
+    -------
+    dy : 1D Numpy Array
+        The change to the thickness of the liquid at each point in the 1d space
+        over the time step 
+    """
     l = len(Fliq0)
     dy = np.zeros((l,))
     for i in range(1,-1):#(1,l-1):
@@ -74,9 +91,27 @@ def f1d(t, Ntot0,  float_params, sigmastep): #sigmastep is an array
     """ odeint function for the one-dimensional ice model, calculates Fliq0 from Ntot
     
     Current version has implemented changes:
-        Replaced calls to diffusionstuff7.getdNliq_dNtot_array() with calculations of Fliq0 from Ntot0
-        Only takes Ntot0 values as an argument (rather than Fliq0 and Ntot0) 
-        Only returns dNtot_dt values (rather than dFliq_dt amd dNtot_dt)"""
+      Replaced calls to diffusionstuff7.getdNliq_dNtot_array() with calculations of Fliq0 from Ntot0
+      Only takes Ntot0 values as an argument (rather than Fliq0 and Ntot0) 
+      Only returns dNtot_dt values (rather than dFliq_dt amd dNtot_dt)
+        
+    Parameters
+    ----------
+    t : float
+        The time step, placeholder for odeint
+    Ntot0 : 1d Numpy Array
+        The initial thickness of the ice and qll
+    float_params : Dictionary
+        Key-value pairs mapping Nbar, Nstar, sigma0, deprate, DoverdeltaX2 to corresponding values
+    sigmastep : 1d Numpy Array
+        TODO    
+
+    Returns
+    -------
+    derivs : 1d Numpy Array
+        The change to thickness of ice and qll layers at each point in the
+        1d array over the time step
+    """
     
     # unpack parameters
     Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
@@ -97,7 +132,7 @@ def f1d(t, Ntot0,  float_params, sigmastep): #sigmastep is an array
 
     ## Package for output, only values of dNtot
     derivs = np.empty(len(Ntot0))
-    derivs[:] = dNtot_dt
+    derivs = dNtot_dt
     return derivs
 
 
@@ -111,14 +146,11 @@ def diffuse_2d(t,y,D,shape):
     ----------
     Fliq0 : 2D Numpy Array 
         The thickness of the liquid over a 2D area
-
     t : float
         The time step-- unused- placeholder for odeint
-
     D : float64
         Diffusion coefficient -- divided by deltaX^2??? #TODO needs to be divided by 
                                             #TODO: cont.      x^2 or y^2 inside this function in order to have non-square discretization
-
     shape : tuple
         The shape of the 2D array Fliq0
 
@@ -126,7 +158,7 @@ def diffuse_2d(t,y,D,shape):
     -------
     dy : Flattened 2D Numpy Array
         The change to the thickness of the liquid at each point in the 2d area over
-         the time step
+        the time step
     """
     m,n = shape
     Fliq0 = np.reshape(np.ascontiguousarray(y),(m,n))
@@ -137,7 +169,6 @@ def diffuse_2d(t,y,D,shape):
         D * (Fliq0[:-2, 1:-1] - 2 * Fliq0[1:-1, 1:-1] + Fliq0[2:, 1:-1])
         + D * (Fliq0[1:-1, :-2] - 2 * Fliq0[1:-1, 1:-1] + Fliq0[1:-1, 2:])
     )
-
     # Handle periodic boundary conditions
     #Edges
     dy[0, 1:-1] = (
@@ -179,14 +210,33 @@ def diffuse_2d(t,y,D,shape):
 ## getting errors (when used in solve_ivp)
 @njit("f8[:](f8,f8[:],f8[:],i8[:],f8[:,:])",parallel=prll_2d) #NOTE: t and y swapped for solve_ivp compatability
 def f2d(t, Ntot0, float_params, int_params, sigmastep):
-    """ 2D version of f1d """
-
-    # diffusion = True
+    """ 2D version of f1d. 
+    
+    NOTE Currently contains unresolved bugs when attempting to solve with odeint
+    
+    Parameters
+    ----------
+    t : float
+        The time step, placeholder for odeint
+    Ntot0 : 1d Numpy Array
+        The initial thickness of the ice and qll
+    float_params : Dictionary
+        Key-value pairs mapping Nbar, Nstar, sigma0, deprate, DoverdeltaX2 to corresponding values
+    int_params : Dictionary
+        Key-value pairs mapping nx, ny to corresponding values
+    sigmastep : 1d Numpy Array
+        TODO
+    
+    Returns
+    -------
+    derivs : Flattened 2D Numpy Array
+        The change to thickness of ice and qll layers at each point in the
+        2d array over the time step
+    """
     
     # unpack parameters
     Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
     nx, ny = int_params
-
 
     # unpack current values of y
     Fliq0 = 1 + Nstar/Nbar * np.sin(2*np.pi*(Ntot0 - Nbar))
@@ -195,10 +245,8 @@ def f2d(t, Ntot0, float_params, int_params, sigmastep):
     sigD = (sigmastep - delta * sigma0)/(1+delta*sigma0)
     depsurf = deprate * sigD
 
-    ## 
     dNtot_dt = depsurf
 
-    # if diffusion:
     # Diffusion
     dy =  np.reshape(np.ascontiguousarray(diffuse_2d(t, np.reshape(np.ascontiguousarray(Fliq0),nx*ny), DoverdeltaX2, np.array((nx,ny)))), (nx,ny))
     # Combined
@@ -211,6 +259,9 @@ def f2d(t, Ntot0, float_params, int_params, sigmastep):
 
 @njit(float64[:](float64[:],float64,float64,float64))#,types.unicode_type))
 def getsigmastep(x,xmax,center_reduction,sigmastepmax):#,method='parabolic'): 
+    """TODO
+    """
+
     sigmapfac = 1-center_reduction/100 #float64
     xmid = max(x)/2 #float64
     #try:
@@ -225,6 +276,9 @@ def getsigmastep(x,xmax,center_reduction,sigmastepmax):#,method='parabolic'):
 
 #@njit(float64[:,:](float64[:],float64[:],float64,float64))
 def getsigmastep_2d(xs,ys,center_reduction,sigmastepmax) -> np.ndarray: 
+    """TODO
+    """
+    
     c_r=center_reduction/100 #float64, convert percentage into decimal form
     # Getting the middle values of "x" and "y"
     xmax = np.max(xs)
