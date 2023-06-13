@@ -16,9 +16,6 @@ from scipy.integrate import solve_ivp
 from numba.types import int64,int32
 import psutil
 
-#####
-import diffusionstuff7 as ds
-
 #for animations
 import matplotlib.animation as animation
 from matplotlib.animation import FuncAnimation, PillowWriter

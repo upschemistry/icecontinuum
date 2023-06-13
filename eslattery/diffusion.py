@@ -117,9 +117,7 @@ def f1d(t, y,  float_params, sigmastep): #sigmastep is an array
 
     # unpack parameters
     Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
-    ##nx = int_params
 
-    ##Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y), (types.int32(2),types.int32(nx)))
     Ntot0 = np.ascontiguousarray(y)
 
     ## Ntot is passed in, Fqll calculated from Ntot
@@ -137,7 +135,6 @@ def f1d(t, y,  float_params, sigmastep): #sigmastep is an array
     dNtot_dt += dy 
 
     ## Package for output, only values of dNtot
-    ##derivs = np.empty(len(Ntot0))
     derivs = dNtot_dt
     return derivs
 
@@ -246,6 +243,7 @@ def f2d(t, Ntot0, float_params, int_params, sigmastep):
 
     # unpack current values of y
     Fliq0 = 1 + Nstar/Nbar * np.sin(2*np.pi*(Ntot0 - Nbar))
+    
     # Deposition
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
     sigD = (sigmastep - delta * sigma0)/(1+delta*sigma0)
