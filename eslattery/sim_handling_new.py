@@ -16,6 +16,9 @@ from scipy.integrate import solve_ivp
 from numba.types import int64,int32
 import psutil
 
+#####
+import diffusionstuff7 as ds
+
 #for animations
 import matplotlib.animation as animation
 from matplotlib.animation import FuncAnimation, PillowWriter
@@ -73,8 +76,14 @@ class SimulationNew(Sim):
             packed_float_params = np.array([Nbar, Nstar, sigmastepmax, sigma0, deprate]) # in the order f1d expects
         if self.dimension >= 1:
             DoverdeltaX2 = self.float_params['DoverdeltaX2']
+            ##nx = self.int_params['nx']
             packed_float_params = np.array([Nbar, Nstar, sigma0, deprate, DoverdeltaX2]) # in the order f1d expects
-    
+            ##packed_int_params = np.array(list(map(int32,[nx]))) # f1d expects int32's
+        if self.dimension == 2:
+            ##ny = self.int_params['ny']
+            ##packed_int_params = np.array(list(map(int64,[nx,ny])))
+            pass
+
         if self.nonstd_init:
             # Nonstandard initial conditions
             Nice = self.starting_ice    
@@ -89,10 +98,10 @@ class SimulationNew(Sim):
                 model_args = (packed_float_params)
             elif self.dimension == 1:
                 sigma = df.getsigmastep(self.x, np.max(self.x), self.center_reduction, self.sigmastepmax)
-                model_args = (packed_float_params,sigma)
+                model_args = (packed_float_params,sigma)##,packed_int_params,sigma)
             elif self.dimension == 2:
                 sigma = df.getsigmastep_2d(self.x,self.y, self.center_reduction, self.sigmastepmax) # supersaturation
-                model_args = (packed_float_params,sigma) 
+                model_args = (packed_float_params,sigma)##,packed_int_params,sigma) 
         else:
             # Lay out the initial system
             if self.dimension == 0:
@@ -108,7 +117,7 @@ class SimulationNew(Sim):
                 elif self.dimension == 2:
                     sigma = df.getsigmastep_2d(self.x,self.y, self.center_reduction, self.sigmastepmax) # supersaturation
                 # Package params
-                model_args = (packed_float_params,sigma)
+                model_args = (packed_float_params,sigma)##,packed_int_params,sigma)
             if self.noisy_init:
                 # Initialize with noise
                 noise = np.random.normal(0,self.noise_std_dev,self.shape)
@@ -137,13 +146,14 @@ class SimulationNew(Sim):
         elif self.dimension == 2:
             Ntot0_start = Ntot[0,0]
             Ntot0 = Ntot[0,0]
-
+     
         counter = 0
         lastlayer = 0
         lastdiff = 0
 
         if self.mem_check:
             memcheckcounter = 0
+
         # Call the ODE solver
         while True:
             # Integrate up to next time step 
@@ -160,7 +170,6 @@ class SimulationNew(Sim):
                         print('Memory usage exceeded threshold. Saving to file and halting.')
                         return self.filename
 
-            Nqll = Nbar + Nstar*np.sin(2*np.pi*Ntot)
             # Locally copy previous thicknesses
             Ntot = ylast
             if self.updatingFliq:
@@ -175,7 +184,7 @@ class SimulationNew(Sim):
             y = solve_ivp_result.y[:, len(solve_ivp_result.t)-1]
             
             # Update the state    
-            ylast = y 
+            ylast = y
             tlast += self.deltaT
             counter += 1
 
@@ -255,7 +264,7 @@ class SimulationNew(Sim):
             """ Returns the array of total ice and QLL thickness at each time step. """
 
             if step is None:
-                return np.asarray(self.results()['y'])
+                return self.results()['y']
             else:
                 return self.results()['y'][step]
             

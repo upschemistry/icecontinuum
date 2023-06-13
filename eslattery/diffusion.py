@@ -87,7 +87,7 @@ def diffuse_1d(Fliq0, DoverdeltaX2):
 
 
 @njit("f8[:](f8,f8[:],f8[:],f8[:])",parallel=prll_1d)#slower with paralellization right now
-def f1d(t, Ntot0,  float_params, sigmastep): #sigmastep is an array
+def f1d(t, y,  float_params, sigmastep): #sigmastep is an array
     """ odeint function for the one-dimensional ice model, calculates Fliq0 from Ntot
     
     Current version has implemented changes:
@@ -113,8 +113,14 @@ def f1d(t, Ntot0,  float_params, sigmastep): #sigmastep is an array
         1d array over the time step
     """
     
+    ## y is Ntot0 ##
+
     # unpack parameters
     Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
+    ##nx = int_params
+
+    ##Fliq0, Ntot0 = np.reshape(np.ascontiguousarray(y), (types.int32(2),types.int32(nx)))
+    Ntot0 = np.ascontiguousarray(y)
 
     ## Ntot is passed in, Fqll calculated from Ntot
     Fliq0 = 1 + Nstar/Nbar * np.sin(2*np.pi*(Ntot0 - Nbar))
@@ -131,7 +137,7 @@ def f1d(t, Ntot0,  float_params, sigmastep): #sigmastep is an array
     dNtot_dt += dy 
 
     ## Package for output, only values of dNtot
-    derivs = np.empty(len(Ntot0))
+    ##derivs = np.empty(len(Ntot0))
     derivs = dNtot_dt
     return derivs
 
