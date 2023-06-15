@@ -230,11 +230,15 @@ def f1d_trial1(y, t, params):
 #     dy[0]  = DoverdeltaX2*(-Fliq0[0] +Fliq0[1]) 
 #     dy[-1] = DoverdeltaX2*(Fliq0[-2] -Fliq0[-1])
      
-    # Combined
+    # Updating the total (ice+liq)
     dNtot_dt += dy
-#     twopi = 2*np.pi
-#     dFliq0_dt = dNtot_dt*Nstar*twopi*np.cos(twopi*(Ntot0-Nbar))
-    dFliq0_dt += dy
+
+    # Updating the liquid (Tayor approximation based on the constraint getNliq(Ntot,Nstar,Nbar,niter))
+    twopi = 2*np.pi
+    dFliq0_dt = dNtot_dt*Nstar*twopi*np.cos(twopi*(Ntot0-Nbar))
+
+#     # This is the original formlation
+#     dFliq0_dt += dy
 
     # Package for output
     derivs = list([dFliq0_dt, dNtot_dt])
