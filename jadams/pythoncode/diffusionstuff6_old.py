@@ -230,16 +230,23 @@ def f1d_trial1(y, t, params):
 #     dy[0]  = DoverdeltaX2*(-Fliq0[0] +Fliq0[1]) 
 #     dy[-1] = DoverdeltaX2*(Fliq0[-2] -Fliq0[-1])
      
-    # Updating the total (ice+liq)
+    # Updating the total (ice+liq) derivative
     dNtot_dt += dy
 
-    # Updating the liquid (Tayor approximation based on the constraint getNliq(Ntot,Nstar,Nbar,niter))
+    # Updating the liquid derivative
+#     # Option 1: the original formlation
+#     dFliq0_dt += dy
+
+    # Option 2: Tayor approximation of the constraint getNliq(Ntot,Nstar,Nbar,niter)
     twopi = 2*np.pi
     dFliq0_dt = dNtot_dt*Nstar*twopi*np.cos(twopi*(Ntot0-Nbar))
 
-#     # This is the original formlation
-#     dFliq0_dt += dy
-
+#     # Option 3 - Numerical evaluation of the constraint equation (much too slow as it stands)
+#     twopi = 2*np.pi
+#     dtprime = 1e-3
+#     dFliq0_dt = (getNliq(Ntot0+dNtot_dt*dtprime,Nstar,Nbar,niter)-Fliq0)/dtprime
+#     # print('from diffusionstuff: ', dFliq0_dt[0], dNtot_dt[0]*Nstar*twopi*np.cos(twopi*(Ntot0[0]-Nbar)))
+    
     # Package for output
     derivs = list([dFliq0_dt, dNtot_dt])
     derivs = np.reshape(derivs,2*nx)
