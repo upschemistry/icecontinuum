@@ -185,6 +185,7 @@ def f1d(y, t, params):
     depsurf = deprate * sigD
     dFliq0_dt = getdNliq_dNtot(Ntot0,Nstar,Nbar,niter)*depsurf
     dNtot_dt = depsurf
+    print('from f1d: ', dFliq0_dt[0],dNtot_dt[0])
 
     # Diffusion
     l = len(Fliq0)
