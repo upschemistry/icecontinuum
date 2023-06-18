@@ -36,8 +36,8 @@ def f1d(y, t, params):
     dNQLL_dt = -depsurf*Nstar*twopi/Nbar*np.cos(twopi*Ntot0)
     dNtot_dt =  depsurf
     
-    # A kluge
-    DoverdeltaX2 *= gamma
+#     # A kluge
+#     DoverdeltaX2 *= gamma
     
     # Diffusion
     l = len(NQLL0)
@@ -54,13 +54,15 @@ def f1d(y, t, params):
 #     dy[-1] = DoverdeltaX2*(NQLL0[-2] -NQLL0[-1])
      
     # Updating the total (ice+liq) derivative
+#     ix = 5
+#     print('From inside f1d, diff/react = ',  Ntot0[ix], dy[ix]/dNQLL_dt[ix])
     dNtot_dt += dy
 
     # Updating the liquid derivative
     
     # Option 1: the original formlation
     dNQLL_dt += dy
-
+    
     # Option 2: Tayor approximation of the constraint getNliq(Ntot,Nstar,Nbar)
 #     dNQLL_dt = -dNtot_dt*Nstar*twopi*np.cos(twopi*Ntot0)
 
