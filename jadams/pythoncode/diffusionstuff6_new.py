@@ -25,7 +25,7 @@ def f0d(y, t, params):
     return derivs
 
 def f1d(y, t, params):
-    Nbar, Nstar, sigmastep, sigma0, deprate, DoverdeltaX2, nx, gamma = params
+    Nbar, Nstar, sigmastep, sigma0, deprate, DoverdeltaX2, nx = params
     NQLL0, Ntot0 = np.reshape(y,(2,nx))      # unpack current values of y
     
     # Deposition
@@ -35,9 +35,6 @@ def f1d(y, t, params):
     depsurf = deprate * sigD
     dNQLL_dt = -depsurf*Nstar*twopi/Nbar*np.cos(twopi*Ntot0)
     dNtot_dt =  depsurf
-    
-#     # A kluge
-#     DoverdeltaX2 *= gamma
     
     # Diffusion
     l = len(NQLL0)
@@ -88,7 +85,7 @@ def f1d(y, t, params):
     return derivs
 
 def f1d_sigD(y, t, params):
-    Nbar, Nstar, sigmastep, sigma0, deprate, DoverdeltaX2, nx, gamma = params
+    Nbar, Nstar, sigmastep, sigma0, deprate, DoverdeltaX2, nx = params
     NQLL0, Ntot0 = np.reshape(y,(2,nx))      # unpack current values of y
     
     # Deposition
