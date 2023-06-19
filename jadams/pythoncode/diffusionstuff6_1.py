@@ -16,9 +16,9 @@ def f0d(y, t, params):
 
     # Deposition
     twopi = 2*np.pi
-    delta = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
-    sigD = (sigmaIcorner - delta * sigma0)/(1+delta*sigma0)
-    depsurf = deprate * sigD
+    m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
+    sigma_m = (sigmaIcorner - m * sigma0)/(1+m*sigma0)
+    depsurf = deprate * sigma_m
     dNQLL_dt = -depsurf*Nstar/Nbar*np.cos(twopi*Ntot0)*twopi
     dNtot_dt =  depsurf
     derivs = [dNQLL_dt, dNtot_dt]
@@ -30,9 +30,9 @@ def f1d(y, t, params):
     
     # Deposition
     twopi = 2*np.pi
-    delta = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
-    sigD = (sigmaI - delta * sigma0)/(1+delta*sigma0)
-    depsurf = deprate * sigD
+    m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
+    sigma_m = (sigmaI - m * sigma0)/(1+m*sigma0)
+    depsurf = deprate * sigma_m
     dNQLL_dt = -depsurf*Nstar*twopi/Nbar*np.cos(twopi*Ntot0)
     dNtot_dt =  depsurf
     
