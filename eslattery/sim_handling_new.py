@@ -108,7 +108,7 @@ class SimulationNew(Sim):
             else:
                 # Dimensions 1 and 2 initializations similar, only difference is in sigma calls
                 Nice = np.ones(self.shape)
-                Nqll = Nbar + Nstar*np.sin(2*np.pi*(Nice)) # calc dimensionalized Nqll
+                Nqll = Nbar - Nstar*np.sin(2*np.pi*(Nice)) # calc dimensionalized Nqll
                 if self.dimension == 1:
                     sigma = df.getsigmastep(self.x, np.max(self.x), self.center_reduction, self.sigmastepmax)
                 elif self.dimension == 2:
@@ -170,7 +170,7 @@ class SimulationNew(Sim):
             # Locally copy previous thicknesses
             Ntot = ylast
             if self.updatingFliq:
-                Nqll = Nbar + Nstar*np.sin(2*np.pi*(Ntot))
+                Nqll = Nbar - Nstar*np.sin(2*np.pi*(Ntot))
             Nice = Ntot - Nqll
 
             # Solve
@@ -180,7 +180,7 @@ class SimulationNew(Sim):
                 solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method=self.method, args=model_args, rtol=self.rtol, atol=self.atol)
             y = solve_ivp_result.y[:, len(solve_ivp_result.t)-1]
             
-            # Update the state    
+            # Update the state   
             ylast = y
             tlast += self.deltaT
             counter += 1
@@ -254,8 +254,12 @@ class SimulationNew(Sim):
                     break
         pass
 
-
-
+        ######### TODO: somehow things go wrong when i shift from using 
+        ## nqll AND ntot to just ntot....try writing runge kutta and see
+        ## what happens :(((
+        ##
+        # def rk(x0,y0,x,h):
+        #     n = (x)
 
     def getNtot(self, step=None) -> np.ndarray:
             """ Returns the array of total ice and QLL thickness at each time step. """
