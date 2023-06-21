@@ -126,16 +126,15 @@ def diffuse_1d(Fliq0, DoverdeltaX2):
     l = len(Fliq0)
     dy = np.zeros((l,))
     for i in range(1,-1):#(1,l-1):
-        dy[i] = DoverdeltaX2*(Fliq0[i+1]-2*Fliq0[i]+Fliq0[i-1])
-    ##dy[1:-1] = DoverdeltaX2 * (Fliq0[:-2] - 2 * Fliq0[1:-1] + Fliq0[2:])
+        dy[i] = DoverdeltaX2*(Fliq0[i+1]-2*Fliq0[i]+Fliq0[-1])
     #boundary conditions
-    dy[0] = DoverdeltaX2*(Fliq0[1]-2*Fliq0[0]+Fliq0[l-1])
-    dy[l-1] = DoverdeltaX2*(Fliq0[0]-2*Fliq0[l-1]+Fliq0[l-2])
+    dy[0] = DoverdeltaX2*(Fliq0[1]-2*Fliq0[0]+Fliq0[-1])
+    dy[-1] = DoverdeltaX2*(Fliq0[0]-2*Fliq0[-1]+Fliq0[-2])
     return dy
 
 
 @njit("f8[:](f8,f8[:],f8[:],f8[:])",parallel=prll_1d)#slower with paralellization right now
-def f1d(t, y,  float_params, sigmastep): #sigmastep is an array
+def f1d(t,y,float_params,sigmaI): #sigmastep is an array
     """ odeint function for the one-dimensional ice model, calculates Fliq0 from Ntot
     
     Current version has implemented changes:
@@ -166,23 +165,21 @@ def f1d(t, y,  float_params, sigmastep): #sigmastep is an array
     # unpack parameters
     Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
 
+    # Ntot is passed in, Fqll calculated from Ntot
     Ntot0 = np.ascontiguousarray(y)
+    Nqll0 = Nbar - Nstar * np.sin(2*np.pi*(Ntot0))
 
-    ## Ntot is passed in, Fqll calculated from Ntot
-    Fliq0 = Nbar - Nstar * np.sin(2*np.pi*(Ntot0))
-
-    ## WHY??? still unsure about this one....
-    delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
-    sigD = (sigmastep - delta * sigma0)/(1+delta*sigma0)
-    depsurf = deprate * sigD
-
+    # Calc depsurf, dNtot_dt before diffusion
+    m = (Nqll0 - (Nbar - Nstar))/(2*Nstar)
+    sigM = (sigmaI - m * sigma0)/(1+m*sigma0)
+    depsurf = deprate * sigM
     dNtot_dt = depsurf
 
     # Diffusion
-    dy = diffuse_1d(Fliq0,DoverdeltaX2)
+    dy = diffuse_1d(Nqll0,DoverdeltaX2)
     dNtot_dt += dy 
 
-    ## Package for output, only values of dNtot
+    # Package for output, only values of dNtot
     derivs = dNtot_dt
     return derivs
 
@@ -290,7 +287,7 @@ def f2d(t, Ntot0, float_params, int_params, sigmastep):
     nx, ny = int_params
 
     # unpack current values of y
-    Fliq0 = 1 + Nstar/Nbar * np.sin(2*np.pi*(Ntot0 - Nbar))
+    Fliq0 = Nbar - Nstar * np.sin(2*np.pi*(Ntot0))
     
     # Deposition
     delta = (Fliq0 - (Nbar - Nstar))/(2*Nstar)
@@ -308,57 +305,68 @@ def f2d(t, Ntot0, float_params, int_params, sigmastep):
     derivs = dNtot_dt.flatten()    
     return derivs
 
+@njit("f8[:](f8[:],f8,f8,f8,unicode_type)",parallel=prll_1d)#slower with paralellization right now
+def getsigmaI(x,xmax,center_reduction,sigmaIcorner,method='sinusoid'):
+    sigmapfac = 1-center_reduction/100
+    xmid = max(x)/2
+    if method == 'sinusoid':
+        fsig = (np.cos(x/xmax*np.pi*2)+1)/2*(1-sigmapfac)+sigmapfac
+    elif method == 'parabolic':
+        fsig = (x-xmid)**2/xmid**2*(1-sigmapfac)+sigmapfac
+    else:
+        print('bad method')
+    return fsig*sigmaIcorner
 
-@njit(float64[:](float64[:],float64,float64,float64))#,types.unicode_type))
-def getsigmastep(x,xmax,center_reduction,sigmastepmax):#,method='parabolic'): 
-    """TODO
-    """
+# @njit(float64[:](float64[:],float64,float64,float64))#,types.unicode_type))
+# def getsigmastep(x,xmax,center_reduction,sigmastepmax):#,method='parabolic'): 
+#     """TODO
+#     """
 
-    sigmapfac = 1-center_reduction/100 #float64
-    xmid = max(x)/2 #float64
-    #try:
-        #if method == 'sinusoid':
-        #    fsig = (np.cos(x/xmax*np.pi*2)+1)/2*(1-sigmapfac)+sigmapfac
-        #elif method == 'parabolic':
-    fsig = (x-xmid)**2/xmid**2*(1-sigmapfac)+sigmapfac
-    #except:
-    #    print('bad method')
-    return fsig*sigmastepmax
+#     sigmapfac = 1-center_reduction/100 #float64
+#     xmid = max(x)/2 #float64
+#     #try:
+#         #if method == 'sinusoid':
+#         #    fsig = (np.cos(x/xmax*np.pi*2)+1)/2*(1-sigmapfac)+sigmapfac
+#         #elif method == 'parabolic':
+#     fsig = (x-xmid)**2/xmid**2*(1-sigmapfac)+sigmapfac
+#     #except:
+#     #    print('bad method')
+#     return fsig*sigmastepmax
 
 
-#@njit(float64[:,:](float64[:],float64[:],float64,float64))
-def getsigmastep_2d(xs,ys,center_reduction,sigmastepmax) -> np.ndarray: 
-    """TODO
-    """
+# #@njit(float64[:,:](float64[:],float64[:],float64,float64))
+# def getsigmastep_2d(xs,ys,center_reduction,sigmastepmax) -> np.ndarray: 
+#     """TODO
+#     """
     
-    c_r=center_reduction/100 #float64, convert percentage into decimal form
-    # Getting the middle values of "x" and "y"
-    xmax = np.max(xs)
-    xmin = np.min(xs)
-    xmid = (xmax-xmin)/2 +xmin 
+#     c_r=center_reduction/100 #float64, convert percentage into decimal form
+#     # Getting the middle values of "x" and "y"
+#     xmax = np.max(xs)
+#     xmin = np.min(xs)
+#     xmid = (xmax-xmin)/2 +xmin 
     
-    ymax = np.max(ys)
-    ymin = np.min(ys)
-    ymid = (ymax-ymin)/2 +ymin
+#     ymax = np.max(ys)
+#     ymin = np.min(ys)
+#     ymid = (ymax-ymin)/2 +ymin
 
-    # Decide on an asymmetry factor
-    asym = (xmax-xmin)/(ymax-ymin)
-    # Calculate 2d parabolic coefficients
-    C0 = sigmastepmax - c_r
-    Cx = c_r/(xmax-xmid)**2
-    Cy = c_r/(ymax-ymid)**2/asym
+#     # Decide on an asymmetry factor
+#     asym = (xmax-xmin)/(ymax-ymin)
+#     # Calculate 2d parabolic coefficients
+#     C0 = sigmastepmax - c_r
+#     Cx = c_r/(xmax-xmid)**2
+#     Cy = c_r/(ymax-ymid)**2/asym
 
-    if sigmastepmax < 0: # ablation case
-        C0 = sigmastepmax + c_r
-        Cx *= -1
-        Cy *= -1      
+#     if sigmastepmax < 0: # ablation case
+#         C0 = sigmastepmax + c_r
+#         Cx *= -1
+#         Cy *= -1      
 
-    # Make a grid and evaluate supersaturation on it
-    #xgrid,ygrid = np.meshgrid(xs-xmid,ys-ymid)
-    ygrid,xgrid = np.meshgrid(ys-ymid,xs-xmid)
-    #print(xgrid,ygrid)
+#     # Make a grid and evaluate supersaturation on it
+#     #xgrid,ygrid = np.meshgrid(xs-xmid,ys-ymid)
+#     ygrid,xgrid = np.meshgrid(ys-ymid,xs-xmid)
+#     #print(xgrid,ygrid)
 
-    #Cy = 0.0 #TODO: temporary, see effect on sigmastep
+#     #Cy = 0.0 #TODO: temporary, see effect on sigmastep
 
-    return C0 + xgrid**2*Cx + ygrid**2*Cy
-    #return np.reshape(C0 + xgrid**2*Cx + ygrid**2*Cy,(xs.size,ys.size))
+#     return C0 + xgrid**2*Cx + ygrid**2*Cy
+#     #return np.reshape(C0 + xgrid**2*Cx + ygrid**2*Cy,(xs.size,ys.size))

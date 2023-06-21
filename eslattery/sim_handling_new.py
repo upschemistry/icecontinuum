@@ -33,6 +33,172 @@ from sim_handling import Simulation as Sim
 class SimulationNew(Sim):   
     ## NOTE only run() and getNtot() have been adjusted to work with diffusion
 
+    def __init__(self, model=None, shape=(None,), method= "LSODA", atol= 1e-6, rtol= 1e-6, noisy=False, noise_stddev=0.01, layermax=0, nonstd_init=False, starting_ice=None, startingNtot=None, discretization_halt=True, mem_check=False, mem_threshold = 100E9, name="simulation"):
+        """Initialize the Simulation
+        Parameters
+        ----------
+        model (func): integratable differential equation model
+        shape (tuple): shape of initial condition
+
+        method (str): integration method
+        atol (float): absolute tolerance
+        rtol (float): relative tolerance
+        noisy (bool): whether to add noise to the initial condition
+        noise_stddev (float): standard deviation of noise to add to initial condition
+        layermax (int): maximum number of layers in the ice
+        """
+        
+        # model integrator arguments
+        self.model = model #integratable differential equation model 
+        self.method = method #default to emulate odeint for solve_ivp
+        self.atol = atol #default absolute tolerance 
+        self.rtol = rtol #default relative tolerance
+        self.shape = shape #shape of initial condition
+
+        # run-time arguments
+        self.discretization_halt = discretization_halt #whether to halt the simulation when the discretization limit is reached
+        self.mem_check = mem_check #whether to write to files to manage memory usage
+        self.memory_threshold = mem_threshold #default virutal memory remaining before halting simulation and saving to file before continuing
+        self.filename = name + '_save.npy'
+        
+        # make initial condition an attribute so it can be accessed for initialization in run()
+        self.nonstd_init = nonstd_init
+        self.starting_ice = starting_ice
+        self.startingNtot = startingNtot
+
+        #calculate dimension of initial condition
+        if len(shape) == 1 and shape[0] == 1:
+            self.dimension = 0
+        else:
+            self.dimension = len(shape)
+
+        ### Experimental arguments ###
+        Nbar = 1.0 #new Nbar from VMD, 260K
+        Nstar = .9/(2*np.pi) #~=0.14137
+        D = 4.0e-4 #micrometers^2/microsecond # Diffusion coefficient #NOTE: T=260K ??
+        nmpermonolayer = 0.3 #thickness of a monolayer of ice #TODO: From MD, 2016 paper?  Sazaki et al. said 0.34 nm per monolayer
+        umpersec_over_mlyperus = (nmpermonolayer/1e3*1e6) #conversion of nanometers per monolayer to micron/sec over monolayers/microsecond
+        nu_kin = 300 #microns/second #NOTE: T=260K ?? 
+        deprate = nu_kin/umpersec_over_mlyperus #bilayers? per microsecond # Deposition rate
+        # Supersaturation
+        self.sigma0 = 0.19
+        self.sigmaIcorner = 0.25 #-0.10 # Must be bigger than sigma0 to get growth, less than 0 for ablatioq
+
+        ### These are run control parameters ###
+        self.noisy_init = noisy
+        self.noise_std_dev = noise_stddev
+        self.updatingNqll = True #flag for explicit updating Fliq(Ntot) every step 
+        # Set up a maximum number of iterations or layers
+        self.uselayers = True
+        if self.uselayers:
+            if layermax == 0:
+                #use default layermaxes
+                if self.dimension == 0:
+                    self.layermax = 4
+                elif self.dimension == 1:
+                    self.layermax = 500
+                elif self.dimension == 2:
+                    self.layermax = 20
+            else:
+                self.layermax = layermax #use user-defined layermax
+
+        #default countermaxes prevent infinite loops
+        if self.dimension == 0:
+            self.countermax = 100
+        elif self.dimension == 1:
+            self.countermax = 10000
+        elif self.dimension == 2:
+            self.countermax = 10000
+        
+        #Dimension dependent parameters and time 
+        t0 = 0.0 #start at time = 0
+        if self.dimension == 0:
+            self.deltaT = 1.0040120320801924 #NOTE/TODO: in continuum_model it was using the 1d deltaT for the 0d simulation
+         
+        discretization = 0.15 #microns per point 
+        if self.dimension > 0:
+            nx = self.shape[0] #number of points in simulation box            
+            xmax = discretization * nx #consistent discretization of 10 points per micron
+            self.x = np.arange(0, xmax, discretization)
+
+            # xmax = 150 # range of x
+            # self.x = np.linspace(0, xmax, nx)
+
+            deltaX = self.x[1]-self.x[0]
+            DoverdeltaX2 = D/deltaX**2 #diffusion coefficient scaled for this time-step and space-step
+
+            # Center_reduction unused by 0d model
+            self.center_reduction = 0.15 #in percent #last exp. parameter
+            c_r = self.center_reduction/100
+
+            # Time steps
+            dtmaxtimefactor = 50 #TODO: what is this?
+            dtmax = deltaX**2/D 
+            self.deltaT = dtmax/dtmaxtimefactor #factored out of diffusion equation... 
+            tmax = self.countermax*self.deltaT #ending time of simulation, used for solve_ivp
+
+        if self.dimension == 2:
+            ny = self.shape[1] 
+            ymax = discretization * ny
+            self.y = np.arange(0, ymax, discretization)
+
+            deltaY = self.y[1]-self.y[0]
+            DoverdeltaY2 = D/deltaY**2 #unused           
+        # self.tinterval = [t0, tmax] #this is for solve_ivp
+        self.tinterval = [t0, self.deltaT] #this is for odeint/ step by step solve ivp integration
+
+        #Save variables not used in model via self.* to an array for saving
+        self._extra_vars = {
+            "Nbar":Nbar,
+            "Nstar":Nstar,
+            "D":D,
+            "nu_kin":nu_kin,
+            "deprate":deprate,
+            "sigma0":self.sigma0,
+            "sigmaIcorner":self.sigmaIcorner,
+            "t0":t0
+        }
+        if self.dimension >= 1:
+            self._extra_vars["dtmax"] = dtmax
+            self._extra_vars["dtmaxtimefactor"] = dtmaxtimefactor
+            self._extra_vars["DoverdeltaX2"]= DoverdeltaX2
+            self._extra_vars["nx"]= nx
+            self._extra_vars["xmax"]= xmax
+            self._extra_vars["deltaX"]= deltaX
+            self._extra_vars["c_r"]= c_r
+        if self.dimension == 2:
+            self._extra_vars["DoverdeltaY2"]= DoverdeltaY2
+            self._extra_vars["ny"]= ny
+            self._extra_vars["ymax"]= ymax
+            self._extra_vars["deltaY"]= deltaY           
+        self._extra_vars_types = {key:type(value) for key,value in self._extra_vars.items()}
+        
+        # Initialize the results dictionary
+        self._results = {None:None}
+        #Intitialize other internal attributes
+        self._plot = None
+        self._animation = None
+        self._rerun = False
+
+        # Initializing model arguments
+        if self.dimension == 0:
+            self.float_params = {'Nbar':Nbar, 'Nstar':Nstar, 'sigmaIcorner':self.sigmaIcorner, 'sigma0':self.sigma0, 'deprate':deprate}
+        elif self.dimension == 1:
+            self.float_params = {'Nbar':Nbar, 'Nstar':Nstar, 'sigma0':self.sigma0, 'deprate':deprate, 'DoverdeltaX2':DoverdeltaX2}
+            self.int_params = {'nx':nx}
+        elif self.dimension == 2:
+            self.float_params = {'Nbar':Nbar,'Nstar':Nstar, 'sigma0':self.sigma0, 'deprate':deprate, 'DoverdeltaX2':DoverdeltaX2}
+            self.int_params = {'nx':nx,'ny':ny}
+        else:
+            raise ValueError("Dimension must be 0, 1, or 2")
+
+        #internal attributes
+        self._plot = None #matplotlib figure
+        self._animation = None #matplotlib animation
+        self._results = {None:None} #solve_ivp (-like) dictionary of results
+        pass
+
+
 
     def run(self, print_progress=True, print_count_layers=False, halve_time_res=False) -> None:
         """ Runs the simulation and saves the results to the Simulation object. (self.results() to get the results)
@@ -62,24 +228,27 @@ class SimulationNew(Sim):
             flop = False # Starts as false to not save the second time step, since the first is always saved
         
         # Unpack parameters
-        if self.dimension >= 0:     # All dimensions have these params
+        if self.dimension >= 0: # All dimensions have these params
             Nbar = self.float_params['Nbar']
             Nstar = self.float_params['Nstar']
             sigma0 = self.float_params['sigma0']
             deprate = self.float_params['deprate']
 
         if self.dimension == 0:     # Dimension specific params
-            sigmastepmax = self.float_params['sigmastepmax']
-            packed_float_params = np.array([Nbar, Nstar, sigmastepmax, sigma0, deprate]) # in the order f1d expects
-        if self.dimension >= 1:
-            DoverdeltaX2 = self.float_params['DoverdeltaX2']
-            ##nx = self.int_params['nx']
-            packed_float_params = np.array([Nbar, Nstar, sigma0, deprate, DoverdeltaX2]) # in the order f1d expects
-            ##packed_int_params = np.array(list(map(int32,[nx]))) # f1d expects int32's
+            sigmaIcorner = self.float_params['sigmaIcorner']
+            packed_float_params = np.array([Nbar, Nstar, sigmaIcorner, sigma0, deprate]) # in the order f1d expects
+            model_args = (packed_float_params)
+        if self.dimension == 1:
+            sigmaI = df.getsigmaI(self.x,np.max(self.x),self.center_reduction,self.sigmaIcorner, method='sinusoid')##df.getsigmastep(self.x, np.max(self.x), self.center_reduction, self.sigmastepmax)
         if self.dimension == 2:
-            ##ny = self.int_params['ny']
-            ##packed_int_params = np.array(list(map(int64,[nx,ny])))
-            pass
+            sigmaI = df.getsigmaI(self.x,np.max(self.x),self.center_reduction,self.sigmaIcorner, method='sinusoid')##df.getsigmastep_2d(self.x,self.y, self.center_reduction, self.sigmastepmax) # supersaturation
+            # nx = self.int_params['nx']
+            # ny = self.int_params['ny']
+            # packed_int_params = np.array(list(map(int64,[nx,ny])))
+        if self.dimension >= 1:     # Similar packaging of params for dim 1 and 2
+            DoverdeltaX2 = self.float_params['DoverdeltaX2']
+            packed_float_params = np.array([Nbar, Nstar, sigma0, deprate, DoverdeltaX2]) # in the order f1d expects
+            model_args = (packed_float_params, sigmaI)
 
         if self.nonstd_init:
             # Nonstandard initial conditions
@@ -90,31 +259,15 @@ class SimulationNew(Sim):
                 # Initialize with noise
                 noise = np.random.normal(0,self.noise_std_dev,self.shape)
                 Nice += noise
-            # Package params
-            if self.dimension == 0:
-                model_args = (packed_float_params)
-            elif self.dimension == 1:
-                sigma = df.getsigmastep(self.x, np.max(self.x), self.center_reduction, self.sigmastepmax)
-                model_args = (packed_float_params,sigma)##,packed_int_params,sigma)
-            elif self.dimension == 2:
-                sigma = df.getsigmastep_2d(self.x,self.y, self.center_reduction, self.sigmastepmax) # supersaturation
-                model_args = (packed_float_params,sigma)##,packed_int_params,sigma) 
         else:
             # Lay out the initial system
             if self.dimension == 0:
                 Nice = 1
                 Nqll = Nbar # Starts as nbar
-                model_args = (packed_float_params)
             else:
                 # Dimensions 1 and 2 initializations similar, only difference is in sigma calls
                 Nice = np.ones(self.shape)
                 Nqll = Nbar - Nstar*np.sin(2*np.pi*(Nice)) # calc dimensionalized Nqll
-                if self.dimension == 1:
-                    sigma = df.getsigmastep(self.x, np.max(self.x), self.center_reduction, self.sigmastepmax)
-                elif self.dimension == 2:
-                    sigma = df.getsigmastep_2d(self.x,self.y, self.center_reduction, self.sigmastepmax) # supersaturation
-                # Package params
-                model_args = (packed_float_params,sigma)##,packed_int_params,sigma)
             if self.noisy_init:
                 # Initialize with noise
                 noise = np.random.normal(0,self.noise_std_dev,self.shape)
@@ -169,7 +322,7 @@ class SimulationNew(Sim):
 
             # Locally copy previous thicknesses
             Ntot = ylast
-            if self.updatingFliq:
+            if self.updatingNqll:
                 Nqll = Nbar - Nstar*np.sin(2*np.pi*(Ntot))
             Nice = Ntot - Nqll
 
@@ -231,13 +384,13 @@ class SimulationNew(Sim):
             # Test whether we're finished
             if self.uselayers:
                 if print_progress:
-                    if self.sigmastepmax <0:
+                    if self.sigmaIcorner <0:
                         prog = round(-1* layer/(self.layermax-1)*100, 2)
                     else:
                         prog = round(layer/(self.layermax-1)*100, 2)
                     # Print progress
                     print("appx progress:" , prog,"%",end="\r")
-                if self.sigmastepmax > 0:
+                if self.sigmaIcorner > 0:
                     if layer > self.layermax-1:
                         print('breaking because reached max number of layers grown')
                         break
