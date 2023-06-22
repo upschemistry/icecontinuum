@@ -10,7 +10,7 @@ def getNQLL(Ntot,Nstar,Nbar):
     fstar = Nstar/Nbar
     return Nbar - Nstar*np.sin(2*np.pi*Ntot)
     
-def f0d(y, t, params):
+def f0d(y, t, params:float):
     Nbar, Nstar, sigmaI, sigma0, nu_kin_mlyperus = params  # unpack parameters
     NQLL0, Ntot0 = y      # unpack current values of y
 
