@@ -125,7 +125,7 @@ def diffuse_1d(Fliq0, DoverdeltaX2):
     """
     l = len(Fliq0)
     dy = np.zeros((l,))
-    for i in range(1,-1):#(1,l-1):
+    for i in range(1,l-1):
         dy[i] = DoverdeltaX2*(Fliq0[i+1]-2*Fliq0[i]+Fliq0[-1])
     #boundary conditions
     dy[0] = DoverdeltaX2*(Fliq0[1]-2*Fliq0[0]+Fliq0[-1])
@@ -163,16 +163,16 @@ def f1d(t,y,float_params,sigmaI): #sigmastep is an array
     ## y is Ntot0 ##
 
     # unpack parameters
-    Nbar, Nstar, sigma0, deprate, DoverdeltaX2 = float_params 
+    Nbar, Nstar, sigma0, nu_kin_mlyperus, DoverdeltaX2 = float_params 
 
     # Ntot is passed in, Fqll calculated from Ntot
     Ntot0 = np.ascontiguousarray(y)
     Nqll0 = Nbar - Nstar * np.sin(2*np.pi*(Ntot0))
 
-    # Calc depsurf, dNtot_dt before diffusion
+    # Calc surface deposition, dNtot_dt before diffusion
     m = (Nqll0 - (Nbar - Nstar))/(2*Nstar)
-    sigM = (sigmaI - m * sigma0)/(1+m*sigma0)
-    depsurf = deprate * sigM
+    sigmaM = (sigmaI - m * sigma0)/(1+m*sigma0)
+    depsurf = nu_kin_mlyperus * sigmaM
     dNtot_dt = depsurf
 
     # Diffusion
