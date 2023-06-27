@@ -10,9 +10,14 @@ from math import floor
 import numpy as np
 from matplotlib import pyplot as plt
 import time
+
 import diffusion as df
+# import diffusionstuff7 as ds
+# import diffusionstuff6_1 as ds6
+
 from copy import copy as dup
 from scipy.integrate import solve_ivp
+from scipy.integrate import odeint
 from numba.types import int64,int32
 import psutil
 
@@ -74,12 +79,13 @@ class SimulationNew(Sim):
 
         ### Experimental arguments ###
         Nbar = 1.0 #new Nbar from VMD, 260K
-        Nstar = .9/(2*np.pi) #~=0.14137
-        D = 4.0e-4 #micrometers^2/microsecond # Diffusion coefficient #NOTE: T=260K ??
+        Nstar = .9/(2*np.pi) #~=0.143239
+        D = 1.6e-4 #micrometers^2/microsecond # Diffusion coefficient #NOTE: T=260K ??
         nmpermonolayer = 0.3 #thickness of a monolayer of ice #TODO: From MD, 2016 paper?  Sazaki et al. said 0.34 nm per monolayer
         umpersec_over_mlyperus = (nmpermonolayer/1e3*1e6) #conversion of nanometers per monolayer to micron/sec over monolayers/microsecond
-        nu_kin = 300 #microns/second #NOTE: T=260K ?? 
-        deprate = nu_kin/umpersec_over_mlyperus #bilayers? per microsecond # Deposition rate
+        nu_kin = 250 #microns/second #NOTE: T=260K ?? 
+        nu_kin_mlyperus = nu_kin/umpersec_over_mlyperus #bilayers? per microsecond # Deposition rate
+        
         # Supersaturation
         self.sigma0 = 0.19
         self.sigmaIcorner = 0.25 #-0.10 # Must be bigger than sigma0 to get growth, less than 0 for ablatioq
@@ -96,7 +102,7 @@ class SimulationNew(Sim):
                 if self.dimension == 0:
                     self.layermax = 4
                 elif self.dimension == 1:
-                    self.layermax = 500
+                    self.layermax = 15000
                 elif self.dimension == 2:
                     self.layermax = 20
             else:
@@ -118,17 +124,17 @@ class SimulationNew(Sim):
         discretization = 0.15 #microns per point 
         if self.dimension > 0:
             nx = self.shape[0] #number of points in simulation box            
-            xmax = discretization * nx #consistent discretization of 10 points per micron
-            self.x = np.arange(0, xmax, discretization)
+            # xmax = discretization * nx #consistent discretization of 10 points per micron
+            # self.x = np.arange(0, xmax, discretization)
 
-            # xmax = 150 # range of x
-            # self.x = np.linspace(0, xmax, nx)
+            xmax = 150 # range of x
+            self.x = np.linspace(0, xmax, nx)
 
             deltaX = self.x[1]-self.x[0]
             DoverdeltaX2 = D/deltaX**2 #diffusion coefficient scaled for this time-step and space-step
 
             # Center_reduction unused by 0d model
-            self.center_reduction = 0.15 #in percent #last exp. parameter
+            self.center_reduction = 0.25 #in percent #last exp. parameter
             c_r = self.center_reduction/100
 
             # Time steps
@@ -153,7 +159,7 @@ class SimulationNew(Sim):
             "Nstar":Nstar,
             "D":D,
             "nu_kin":nu_kin,
-            "deprate":deprate,
+            "nu_kin_mlyperus":nu_kin_mlyperus,
             "sigma0":self.sigma0,
             "sigmaIcorner":self.sigmaIcorner,
             "t0":t0
@@ -182,12 +188,12 @@ class SimulationNew(Sim):
 
         # Initializing model arguments
         if self.dimension == 0:
-            self.float_params = {'Nbar':Nbar, 'Nstar':Nstar, 'sigmaIcorner':self.sigmaIcorner, 'sigma0':self.sigma0, 'deprate':deprate}
+            self.float_params = {'Nbar':Nbar, 'Nstar':Nstar, 'sigmaIcorner':self.sigmaIcorner, 'sigma0':self.sigma0, 'nu_kin_mlyperus':nu_kin_mlyperus}
         elif self.dimension == 1:
-            self.float_params = {'Nbar':Nbar, 'Nstar':Nstar, 'sigma0':self.sigma0, 'deprate':deprate, 'DoverdeltaX2':DoverdeltaX2}
+            self.float_params = {'Nbar':Nbar, 'Nstar':Nstar, 'sigma0':self.sigma0, 'nu_kin_mlyperus':nu_kin_mlyperus, 'DoverdeltaX2':DoverdeltaX2}
             self.int_params = {'nx':nx}
         elif self.dimension == 2:
-            self.float_params = {'Nbar':Nbar,'Nstar':Nstar, 'sigma0':self.sigma0, 'deprate':deprate, 'DoverdeltaX2':DoverdeltaX2}
+            self.float_params = {'Nbar':Nbar,'Nstar':Nstar, 'sigma0':self.sigma0, 'nu_kin_mlyperus':nu_kin_mlyperus, 'DoverdeltaX2':DoverdeltaX2}
             self.int_params = {'nx':nx,'ny':ny}
         else:
             raise ValueError("Dimension must be 0, 1, or 2")
@@ -232,22 +238,22 @@ class SimulationNew(Sim):
             Nbar = self.float_params['Nbar']
             Nstar = self.float_params['Nstar']
             sigma0 = self.float_params['sigma0']
-            deprate = self.float_params['deprate']
+            nu_kin_mlyperus = self.float_params['nu_kin_mlyperus']
 
         if self.dimension == 0:     # Dimension specific params
             sigmaIcorner = self.float_params['sigmaIcorner']
-            packed_float_params = np.array([Nbar, Nstar, sigmaIcorner, sigma0, deprate]) # in the order f1d expects
+            packed_float_params = np.array([Nbar, Nstar, sigmaIcorner, sigma0, nu_kin_mlyperus]) # in the order f1d expects
             model_args = (packed_float_params)
         if self.dimension == 1:
-            sigmaI = df.getsigmaI(self.x,np.max(self.x),self.center_reduction,self.sigmaIcorner, method='sinusoid')##df.getsigmastep(self.x, np.max(self.x), self.center_reduction, self.sigmastepmax)
+            sigmaI = df.getsigmaI(self.x,np.max(self.x),self.center_reduction,self.sigmaIcorner, method='parabolic')##df.getsigmastep(self.x, np.max(self.x), self.center_reduction, self.sigmaIcorner)
         if self.dimension == 2:
-            sigmaI = df.getsigmaI(self.x,np.max(self.x),self.center_reduction,self.sigmaIcorner, method='sinusoid')##df.getsigmastep_2d(self.x,self.y, self.center_reduction, self.sigmastepmax) # supersaturation
+            sigmaI = df.getsigmaI(self.x,np.max(self.x),self.center_reduction,self.sigmaIcorner, method='parabolic')##df.getsigmastep_2d(self.x,self.y, self.center_reduction, self.sigmaIcorner) # supersaturation
             # nx = self.int_params['nx']
             # ny = self.int_params['ny']
             # packed_int_params = np.array(list(map(int64,[nx,ny])))
         if self.dimension >= 1:     # Similar packaging of params for dim 1 and 2
             DoverdeltaX2 = self.float_params['DoverdeltaX2']
-            packed_float_params = np.array([Nbar, Nstar, sigma0, deprate, DoverdeltaX2]) # in the order f1d expects
+            packed_float_params = np.array([Nbar, Nstar, sigma0, nu_kin_mlyperus, DoverdeltaX2]) # in the order f1d expects
             model_args = (packed_float_params, sigmaI)
 
         if self.nonstd_init:
@@ -282,6 +288,16 @@ class SimulationNew(Sim):
         ylast = dup(y0)
         tlast = dup(self.tinterval)
 
+
+        # print('sigma0',sigma0)
+        # print('Nbar',Nbar)
+        # print('Nstar',Nstar)
+        # print('nu_kin_mlyperus',nu_kin_mlyperus)
+        # print('DoverdeltaX2',DoverdeltaX2)
+        # print('center reduction',self.center_reduction)
+        # print('detlat',self.deltaT)
+
+
         # Initial conditions for ODE solver goes into keeper dictionary
         self._results['y'] = [y0]
         self._results['t'] = [self.tinterval]
@@ -303,116 +319,164 @@ class SimulationNew(Sim):
 
         if self.mem_check:
             memcheckcounter = 0
+        
+
+        ############
+        Ntot_init_1D = np.ones(self.shape)
+        # NQLL_init_1D = ds.getNQLL(Ntot_init_1D,Nstar,Nbar)
+
+        # Initialize the keeper arrays
+        tkeep_1D = []
+        ykeep_1D = []
+        tlast = self.tinterval[0]
 
         # Call the ODE solver
+        ylast = Ntot_init_1D
+        counter = 0
+        layer = 0
+        ttot = 0.0
         while True:
-            # Integrate up to next time step 
-            
-            # Check the memory usage
-            if self.mem_check:
-                memcheckcounter += 1
-                if memcheckcounter % 4 == 0: # Only check every 4 steps to save time checking memory
-                    memory_available = psutil.swap_memory().free
-                    if memory_available <= self.memory_threshold:
-                        # Write or append to file
-                        ## TODO does this still work??
-                        super.woa_to_file(self, self.filename)
-                        print('Memory usage exceeded threshold. Saving to file and halting.')
-                        return self.filename
-
-            # Locally copy previous thicknesses
-            Ntot = ylast
-            if self.updatingNqll:
-                Nqll = Nbar - Nstar*np.sin(2*np.pi*(Ntot))
-            Nice = Ntot - Nqll
-
-            # Solve
-            if self.method == 'odeint':
-                solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method='RK45', args=model_args, rtol=self.rtol, atol=self.atol)#, t_eval=self.tinterval)
-            else:
-                solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method=self.method, args=model_args, rtol=self.rtol, atol=self.atol)
-            y = solve_ivp_result.y[:, len(solve_ivp_result.t)-1]
-            
-            # Update the state   
-            ylast = y
+            # Integrate up to next time step
+            y = odeint(self.model, ylast, self.tinterval, args=(model_args),rtol=1e-12,tfirst=True)
+            ylast = list(y[1,:])
             tlast += self.deltaT
-            counter += 1
-
-            # For calculating layers
-            if self.dimension == 0:
-                Ntot0 = Ntot
-            elif self.dimension == 1:
-                Ntot0 = Ntot[0]
-            elif self.dimension == 2:
-                Ntot0 = Ntot[0,0]
             
-            if halve_time_res:
-            # Logic to only save every other time step (including first and last)
-                if flop:
-                    self._results['y'].append(ylast)
-                    self._results['t'].append(tlast)
-                    flop = False
-                else:
-                    flop = True # flop is a boolean that flips between true and false
-            else:    
-                # Stuff into keeper arrays
-                self._results['y'].append(ylast)
-                self._results['t'].append(tlast)
+            # Stuff into keeper arrays
+            ykeep_1D.append(ylast)
+            tkeep_1D.append(tlast)
+
+            # Make some local copies, with possible updates to NQLL
+            ttot += self.deltaT
 
             # Update counters and see whether to break
-            layer = Ntot0-Ntot0_start
-            if (layer-lastlayer) > 0:
-                minpoint = np.min(Nice)
-                maxpoint = np.max(Nice)
-                if print_count_layers:
-                    if counter == 1:
-                        # Print what each thing is
-                        print('counter, layer, depth_of_facet_in_layers, delta_depth')
-                    print(counter-1, lastlayer, maxpoint-minpoint, maxpoint-minpoint-lastdiff)
-                lastdiff = maxpoint-minpoint
+            Ntotlast = ylast
+            minpoint = min(Ntotlast)
+            maxpoint = max(Ntotlast)
+            if np.mod(counter,100) == 0:
+                print(counter-1, int(Ntotlast[0]), maxpoint-minpoint)
+            counter += 1
+            
+            if Ntotlast[0] > self.layermax-1:
+                self._results['y']=ykeep_1D                    
+                self._results['t']=tkeep_1D
+                break
+            if counter > self.countermax-1:
+                self._results['y']=ykeep_1D
+                self._results['t']=tkeep_1D
+                break
 
-                # Break if too many steps for discretization
-                if lastdiff > max(self.shape)//10:
-                    if not warningIssued:
-                        print('Warning: too many steps for discretization after', minpoint, 'layers grown')
-                        warningIssued = True
-                    if self.discretization_halt:
-                        print('Halting due to lack of discretization')
-                        break
-                lastlayer += 1
+        # Call the ODE solver
+        # while True:
+        #     # Integrate up to next time step 
+            
+        #     # Check the memory usage
+        #     if self.mem_check:
+        #         memcheckcounter += 1
+        #         if memcheckcounter % 4 == 0: # Only check every 4 steps to save time checking memory
+        #             memory_available = psutil.swap_memory().free
+        #             if memory_available <= self.memory_threshold:
+        #                 # Write or append to file
+        #                 ## TODO does this still work??
+        #                 super.woa_to_file(self, self.filename)
+        #                 print('Memory usage exceeded threshold. Saving to file and halting.')
+        #                 return self.filename
+
+            
+
+            # Locally copy previous thicknesses
+            # Ntot = ylast
+            # if self.updatingNqll:
+            #     Nqll = Nbar - Nstar*np.sin(2*np.pi*(Ntot))
+            # Nice = Ntot - Nqll
+
+            # Solve
+            # if self.method == 'odeint':
+            #     solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method='RK45', args=model_args, rtol=self.rtol, atol=self.atol)#, t_eval=self.tinterval)
+            # else:
+            #     y = odeint(self.model, ylast, self.tinterval, args=model_args,rtol=self.rtol,atol=self.atol,tfirst=True)
+            #     # solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method=self.method, args=model_args, rtol=self.rtol, atol=self.atol)
+            # # y = solve_ivp_result.y[:, len(solve_ivp_result.t)-1]
+
+            # # Update the state   
+            # # ylast = y
+            # ylast = list(y[1,:])
+            # tlast += self.deltaT
+            # counter += 1
+
+            # # For calculating layers
+            # if self.dimension == 0:
+            #     Ntot0 = Ntot
+            # elif self.dimension == 1:
+            #     Ntot0 = Ntot[0]
+            # elif self.dimension == 2:
+            #     Ntot0 = Ntot[0,0]
+            
+            # if halve_time_res:
+            # # Logic to only save every other time step (including first and last)
+            #     if flop:
+            #         self._results['y'].append(ylast)
+            #         self._results['t'].append(tlast)
+            #         flop = False
+            #     else:
+            #         flop = True # flop is a boolean that flips between true and false
+            # else:    
+            #     # Stuff into keeper arrays
+            #     self._results['y'].append(ylast)
+            #     self._results['t'].append(tlast)
+
+            # # Update counters and see whether to break
+            # layer = Ntot0-Ntot0_start
+            # if (layer-lastlayer) > 0:
+            #     minpoint = np.min(Ntot)
+            #     maxpoint = np.max(Ntot)
+            #     if print_count_layers:
+            #         if counter == 1:
+            #             # Print what each thing is
+            #             print('counter, layer, depth_of_facet_in_layers, delta_depth')
+            #         print(counter-1, lastlayer, maxpoint-minpoint, maxpoint-minpoint-lastdiff)
+            #     lastdiff = maxpoint-minpoint
+
+            #     # Break if too many steps for discretization
+            #     if lastdiff > max(self.shape)//10:
+            #         if not warningIssued:
+            #             print('Warning: too many steps for discretization after', minpoint, 'layers grown')
+            #             warningIssued = True
+            #         if self.discretization_halt:
+            #             print('Halting due to lack of discretization')
+            #             break
+            #     lastlayer += 1
                 
-            # Test whether we're finished
-            if self.uselayers:
-                if print_progress:
-                    if self.sigmaIcorner <0:
-                        prog = round(-1* layer/(self.layermax-1)*100, 2)
-                    else:
-                        prog = round(layer/(self.layermax-1)*100, 2)
-                    # Print progress
-                    print("appx progress:" , prog,"%",end="\r")
-                if self.sigmaIcorner > 0:
-                    if layer > self.layermax-1:
-                        print('breaking because reached max number of layers grown')
-                        break
-                else:
-                    if layer < -self.layermax:
-                        print('breaking because reached max number of layers ablated')
-                        break
-            else:
-                if print_progress:
-                    prog = round(counter/(self.countermax)*100, 2)
-                    print("appx progress:" , prog,"%",end="\r")
-                if counter > self.countermax-1:
-                    print('breaking because reached max number of iterations')
-                    break
+            # # Test whether we're finished
+            # if self.uselayers:
+            #     if print_progress:
+            #         if self.sigmaIcorner <0:
+            #             prog = round(-1* layer/(self.layermax-1)*100, 2)
+            #         else:
+            #             prog = round(layer/(self.layermax-1)*100, 2)
+            #         # Print progress
+            #         print("appx progress:" , prog,"%",end="\r")
+            #     if self.sigmaIcorner > 0:
+            #         if layer > self.layermax-1:
+            #             print('breaking because reached max number of layers grown')
+            #             break
+            #     else:
+            #         if layer < -self.layermax:
+            #             print('breaking because reached max number of layers ablated')
+            #             break
+            # else:
+            #     if print_progress:
+            #         prog = round(counter/(self.countermax)*100, 2)
+            #         print("appx progress:" , prog,"%",end="\r")
+            #     if counter > self.countermax-1:
+            #         print('breaking because reached max number of iterations')
+            #         break
         pass
 
-        ######### TODO: somehow things go wrong when i shift from using 
-        ## nqll AND ntot to just ntot....try writing runge kutta and see
-        ## what happens :(((
-        ##
-        # def rk(x0,y0,x,h):
-        #     n = (x)
+    def results(self) -> dict:
+        """ Returns results of simulation (handles running if necessary) """
+        if self._results == {None:None}:
+            self.run()
+        return self._results
 
     def getNtot(self, step=None) -> np.ndarray:
             """ Returns the array of total ice and QLL thickness at each time step. """
@@ -423,24 +487,24 @@ class SimulationNew(Sim):
                 return self.results()['y'][step]
             
 
-    ############################################
-    ################## TODO ####################
-    ############################################
+    ###########################################
+    ################# TODO ####################
+    ###########################################
 
-    ########### FUNCTIONS BELOW SHOULD WORK THE SAME TODO CHECK THAT THEY DO
-            #### plot()
-            #### animate()
-            #### save()
-            #### load()
-            #### save_plot()
-            #### save_animation()
-            #### copy_sim()
-            #### loadSim()
-            #### get_expected_nss_steps()
-            #### woa_to_file()
-            #### continue_from_file()
-            #### continue_from_surface()
-            #### multiple_test_avg_time()
+    ########## FUNCTIONS BELOW SHOULD WORK THE SAME TODO CHECK THAT THEY DO
+            ### plot()
+            ### animate()
+            ### save()
+            ### load()
+            ### save_plot()
+            ### save_animation()
+            ### copy_sim()
+            ### loadSim()
+            ### get_expected_nss_steps()
+            ### woa_to_file()
+            ### continue_from_file()
+            ### continue_from_surface()
+            ### multiple_test_avg_time()
 
     ## TODO CAN I RENAME THIS TO getNqll()?
     def getFliq(self, step=None) -> np.ndarray:
