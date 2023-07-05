@@ -9,6 +9,12 @@ import copy
 def getNQLL(Ntot,Nstar,Nbar):
     return Nbar - Nstar*np.sin(2*np.pi*Ntot)
 
+def getsigmaM_ft(Nqll,params):
+    N,Nbar,Nstar,sigmaI,sigma0 = params
+    m = (Nqll - (Nbar - Nstar))/(2*Nstar)
+    return (sigmaI[:(2*N-2)] - m*sigma0)/(1 + m*sigma0)
+
+    
 def getsigmaM(N,params,isNqll=True):
     # unpack params
     Nbar,Nstar,sigmaI,sigma0 = params
@@ -90,6 +96,8 @@ def f1d(y, t, params):
     depsurf = nu_kin_mlyperus * sigma_m
     dNQLL_dt = -depsurf*Nstar*twopi/Nbar*np.cos(twopi*Ntot0)
     dNtot_dt =  depsurf
+
+    # print(len(sigma_m))
     
     # Diffusion
     dy = np.zeros(np.shape(NQLL0))
