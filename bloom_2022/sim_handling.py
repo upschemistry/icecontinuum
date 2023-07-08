@@ -85,6 +85,10 @@ class Simulation():
         self.rtol = rtol #default relative tolerance
         self.shape = shape #shape of initial condition
 
+        #0d shape (1,) is a special case
+        #1d shape (n,)
+        #2d shape (n,m)
+
         # run-time arguments
         self.discretization_halt = discretization_halt #whether to halt the simulation when the discretization limit is reached
         self.mem_check = mem_check #whether to write to files to manage memory usage
@@ -581,6 +585,8 @@ class Simulation():
             plt.legend()
             plt.xlabel(r'x ($\mu m$)')
             plt.ylabel('Layers of ice')
+
+        #lets make this section of the plotting function from a boolean control flow and then plotting to a boolean control flow and then a function that plots just the 2d model data.
         elif self.dimension == 2:
             #access coordinate arrays for plotting
             ys, xs = np.meshgrid(self.y, self.x)
@@ -606,6 +612,7 @@ class Simulation():
             ax.set_xlabel(r'x ($\mu m$)')
             ax.set_ylabel(r'y ($\mu m$)')
             ax.set_zlabel('Layers of ice')
+            
             # else:
             #     print('Error: dimension not supported')
             #     return None
