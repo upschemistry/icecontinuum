@@ -6,6 +6,8 @@ from math import floor
 import numpy as np
 from matplotlib import pyplot as plt
 import time
+
+import diffusion as df
 import diffusionstuff7 as ds
 from copy import copy as dup
 from scipy.integrate import solve_ivp
@@ -400,7 +402,8 @@ class Simulation():
             else:
                 #old version: solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method=self.method, args=model_args, t_eval=self.tinterval, rtol=self.rtol, atol=self.atol)
                 solve_ivp_result = solve_ivp(self.model, self.tinterval, np.reshape(ylast,np.prod(np.shape(ylast))), method=self.method, args=model_args, rtol=self.rtol, atol=self.atol)
-        
+                #solve_ivp_result = df.rk4_solver(self.model,self.tinterval,np.reshape(ylast,np.prod(np.shape(ylast))),args=model_args)
+            ##print(solve_ivp_result)
             y = solve_ivp_result.y[:, len(solve_ivp_result.t)-1]#y[:,-1] : get last timestep that solve_ivp returns
             
             # Update the state                 
@@ -485,7 +488,7 @@ class Simulation():
         #solve_ivp does not support terminating after a given number of layers
         #self._results = solve_ivp(self.model, self.t_span, self.y0, t_eval=self.t_eval, method=self.method, atol=self.atol, rtol=self.rtol, args=self._args)
         pass
-    
+
     def results(self) -> dict:
         """ Returns results of simulation (handles running if necessary) """
         if self._results == {None:None}:
