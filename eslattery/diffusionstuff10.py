@@ -98,7 +98,9 @@ def f1d(y, t, params):
     dNtot_dt =  depsurf
 
     # print(len(sigma_m))
-    
+    # print(dNQLL_dt)
+
+
     # Diffusion
     dy = np.zeros(np.shape(NQLL0))
     for i in range(1,len(NQLL0)-1):
@@ -108,6 +110,9 @@ def f1d(y, t, params):
      
     dNtot_dt += dy
     dNQLL_dt += dy
+
+    # print('ori Ntot ', dNtot_dt[:10])
+    # print('ori Nqll ', dNQLL_dt[:10])
 
     # Package for output
     derivs = list([dNQLL_dt, dNtot_dt])
