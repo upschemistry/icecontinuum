@@ -172,13 +172,8 @@ class runSim():
 
 def fftnorm(u_full):
     """Computes normalized FFT (such that FFT and IFFT are symmetrically normalized)
-    ### rfft excludes redundant outputs; complex conjugates are left out so every bin only has the positive frequencies
-    ### norm='forward' arg normalizes transform by 1/n, inverse transform is unscaled
-    ### TODO: qs
-    ###     does this mean the inverse transform is natrually scaled back to map to original untransformed scale??
-    ###     is this better than (eg MZKdV.py) mult by 1/N??
-
-    ### NOTE: rfft RETURNS A SHORTENED ARRAY (about haf the size)
+    NOTE: rfft excludes redundant outputs; complex conjugates are left out so every bin only has the positive frequencies
+          norm='forward' arg normalizes transform by 1/n, inverse transform is unscaled
 
     Parameters
     ----------
@@ -187,7 +182,7 @@ def fftnorm(u_full):
 
     Returns
     -------
-    normalizedFFT : 1D Numpy Array (N,)
+    normalizedFFT : 1D Numpy Array (N/2 + 1,)
         The transformed version of that vector
     """
 
@@ -196,7 +191,7 @@ def fftnorm(u_full):
 
 def ifftnorm(u_full):
     """Computes normalized IFFT (such that FFT and IFFT are symmetrically normalized)
-    ### irfft is inverse of rfft, norm is forward for symmetric normalizations
+    NOTE: irfft is inverse of rfft, norm is forward for symmetric normalizations
 
     Parameters
     ----------
@@ -205,14 +200,14 @@ def ifftnorm(u_full):
 
     Returns
     -------
-    normalizedIFFT : 1D Numpy Array (N,)
+    normalizedIFFT : 1D Numpy Array (2*(N-1),)
         The transformed version of that vector
     """
     
     normalizedIFFT = np.fft.irfft(u_full, norm = "forward")
     return normalizedIFFT
 
-def convolution(nTOTk,nu_kin_mlyperus,sigmaM,Nstar):
+def convolution(nTOTk,nu_kin_mlyperus,sigMk,Nstar):
     """Computes Fourier transform of the nonlinear term in the QLL PDE
     
     - 2 pi N^* nuKin sigmaM cos(Ntot)
@@ -220,22 +215,19 @@ def convolution(nTOTk,nu_kin_mlyperus,sigmaM,Nstar):
     Computed in real space and then converted back
     to Fourier space.
 
-    ### sigmaM is eqn 6 in paper, ~~delta kinda~~ but entirely dependent on Nqll
-    ###
-
     Parameters
     ----------
     nT : 1D Numpy Array (N,)
         Total water layers, in k space
-        
-    nu_kin_mlyperus : TBD
+
+    nu_kin_mlyperus : float
         Deposition rate in monolayers per microsecond
         
-    sigmaM : TBD
-        Microscopic supersaturation, dependent on position through m dependence on Nqll, in real space
+    sigMk : 1D Numpy Array (N,)
+        Microscopic supersaturation, dependent on position through m dependence on Nqll, in k space
         
-    Nstar : TBD
-        Parameterizes variation about the mean (simply a best fit parameter??)
+    Nstar : float
+        Parameterizes variation about the mean of NQLL(Ntot)
 
     Returns
     -------
@@ -244,14 +236,13 @@ def convolution(nTOTk,nu_kin_mlyperus,sigmaM,Nstar):
     """
     
     # compute double sum in real space, then apply scalar multiplier
-    convo = - 2 * np.pi * Nstar * nu_kin_mlyperus * fftnorm(sigmaM * np.cos(2*np.pi * ifftnorm(nTOTk)))
+    convo = -2 * np.pi * Nstar * nu_kin_mlyperus * fftnorm(ifftnorm(sigMk) * np.cos(2*np.pi * ifftnorm(nTOTk)))
     return convo
 
-def nTotRHS(nQLLk,nu_kin_mlyperus,sigmaM,k,D):
+def nTotRHS_2var(nQLLk,nu_kin_mlyperus,sigMk,k,D):
     """Computes RHS of the ODE for the positive modes of Ntot
     
-    ##TODO: why factor of 2pi?? how are we normalizing here??
-    dnk/dt = -k^2 D nkQLL + 2 pi FFT(sigma_m) nu_kin
+    dnk/dt = -k^2 D nkQLL + FFT(sigma_m) nu_kin
     
     
     Parameters
@@ -259,14 +250,14 @@ def nTotRHS(nQLLk,nu_kin_mlyperus,sigmaM,k,D):
     nQLL : 1D Numpy Array (N,)
         Positive modes of state vector for quasi-liquid layers
         
-    nu_kin_mlyperus : TBD
+    nu_kin_mlyperus : float
         Deposition rate in monolayers per microsecond
         
-    sigmaM : TBD
-        Microscopic supersaturation, dependent on position through m dependence on Nqll, in real space
+    sigMk : 1D Numpy Array (N,)
+        Microscopic supersaturation, dependent on position through m dependence on Nqll, in k space
         
     k : 1D Numpy Array (N,)
-        Vector of (nonredundant??) wavenumbers
+        Vector of positive wavenumbers
         
     D : float
         Diffusion coefficient
@@ -277,16 +268,45 @@ def nTotRHS(nQLLk,nu_kin_mlyperus,sigmaM,k,D):
         Rate of change of positive modes of nTot
     """
 
-    dnTot = -k**2 * D * nQLLk + nu_kin_mlyperus * fftnorm(sigmaM)
+    dnTot = -k**2 * D * nQLLk + nu_kin_mlyperus * sigMk
     return dnTot
 
-def nQLLRHS(nTOTk,nQLLk,nu_kin_mlyperus,sigmaM,k,D,Nstar):
+def nTotRHS_1var(nTOTk,nu_kin_mlyperus,sigMk,k,D,Nstar):
+    """Computes RHS of the ODE for the positive modes of Ntot
+    dnk/dt = -k^2 D nkQLL + 2 pi FFT(sigma_m) nu_kin
+    
+    
+    Parameters
+    ----------
+    nQLL : 1D Numpy Array (N,)
+        Positive modes of state vector for quasi-liquid layers
+        
+    nu_kin_mlyperus : float
+        Deposition rate in monolayers per microsecond
+        
+    sigMk : 1D Numpy Array (N,)
+        Transformed sigmaM for positive modes k
+        
+    k : 1D Numpy Array (N,)
+        Vector of wavenumbers
+        
+    D : float
+        Diffusion coefficient
+
+    Returns
+    -------
+    dnTot : 1D Numpy Array (N,)
+        Rate of change of positive modes of nTot
+    """
+
+    dnTot = k**2 * D * Nstar * fftnorm(np.sin(2*np.pi * ifftnorm(nTOTk))) + nu_kin_mlyperus*sigMk
+    return dnTot
+
+def nQLLRHS_2var(nTOTk,nQLLk,nu_kin_mlyperus,sigMk,k,D,Nstar):
     """Computes RHS of the ODE for the positive modes of Ntot
     
-    ##TODO: i dont see where the 2pi in dn0 comes from??
-    dn0/dt = 2 * pi * sigma_m * nu_kin
+    dn0/dt = FFT(sigma_m) * nu_kin
     dnk/dt = -k^2 D nkQLL
-    
     
     Parameters
     ----------
@@ -296,11 +316,11 @@ def nQLLRHS(nTOTk,nQLLk,nu_kin_mlyperus,sigmaM,k,D,Nstar):
     nQLL : 1D Numpy Array (N,)
         Positive modes of state vector for quasi-liquid layers
         
-    nu_kin_mlyperus : TBD
+    nu_kin_mlyperus : float
         Deposition rate in monolayers per microsecond
         
-    sigmaM : TBD
-        Microscopic supersaturation, dependent on position through m dependence on Nqll, in real space
+    sigMk : 1D Numpy Array (N,)
+        Microscopic supersaturation, dependent on position through m dependence on Nqll, in k space
         
     k : 1D Numpy Array (N,)
         Vector of wavenumbers
@@ -309,7 +329,7 @@ def nQLLRHS(nTOTk,nQLLk,nu_kin_mlyperus,sigmaM,k,D,Nstar):
         Diffusion coefficient
         
     Nstar : float
-        TBD
+        Parameterizes variation about the mean of NQLL(Ntot)
 
     Returns
     -------
@@ -319,6 +339,110 @@ def nQLLRHS(nTOTk,nQLLk,nu_kin_mlyperus,sigmaM,k,D,Nstar):
     
     ## convolution computed: 
     ## -2*np.pi*Nstar*nu_kin_mlyperus * fftnorm(sigmaM * np.cos(2*np.pi * ifftnorm(nTot)))
-    convo = convolution(nTOTk,nu_kin_mlyperus,sigmaM,Nstar)
+    convo = convolution(nTOTk,nu_kin_mlyperus,sigMk,Nstar)
     dnQLL = -k**2 * D * nQLLk + convo
     return dnQLL
+
+def RHS_2var(t,n,params):
+    """
+    Computes the RHS for a full KdV or ROM simulation. For use in solver.
+    TODO : package params better for nQLLRHS and nTOTRHS
+
+    Parameters
+    ----------
+    t : float
+        Current time
+        
+    n : Numpy array (2N,)
+        Current state vector of positive modes (total first, then QLL)
+              
+    params : Dictionary
+             Dictionary of relevant parameters (see below)
+        N : float, number of positive modes in simulation
+        nu_kin : 
+        sigmastep : 
+        sigmastep_FFT : 
+        k : 
+        D : 
+        
+    Returns
+    -------
+    RHS : 1D Numpy array (2N,)
+          Derivative of each positive mode in state vector
+    """
+    
+    # extract parameters from dictionary
+    N = params['N']
+    nu_kin_mlyperus = params['deprate']
+    k = params['k']
+    D = params['D']
+    Nstar = params['Nstar']
+    Nbar = params['Nbar']
+    sigma0 = params['sigma0']
+    sigmaI = params['sigmaI']
+    
+    nQLL = n[:N]
+    nTot = n[N:]
+    
+    sigmaM = ds.getsigmaM(ifftnorm(nQLL),[Nbar,Nstar,sigmaI,sigma0])
+    sigMk = fftnorm(sigmaM)
+
+    dnT = nTotRHS_2var(nQLL,nu_kin_mlyperus,sigMk,k,D)
+    dnQ = nQLLRHS_2var(nTot,nQLL,nu_kin_mlyperus,sigMk,k,D,Nstar)
+    
+    RHS = np.concatenate((dnQ, dnT))
+
+    return RHS
+
+def RHS_1var(t,n,params):
+    """
+    Computes the RHS for the 1 variable system. For use in solver.
+    
+    Parameters
+    ----------
+    t : float
+        Current time
+        
+    n : Numpy array (N,)
+        Current state vector of positive modes (only total)
+              
+    params : Dictionary
+             Dictionary of relevant parameters (see below)
+        N : float, number of positive modes in simulation
+        nu_kin_mlyperus : 
+        sigma0 : 
+        sigmaI : 
+        k : 
+        D : 
+        Nstar :
+        Nbar : 
+
+    Returns
+    -------
+    RHS : 1D Numpy array (N,)
+          Derivative of each positive mode in state vector
+    """
+    
+    # extract parameters from dictionary
+    N = params['N']
+    nu_kin_mlyperus = params['deprate']
+    k = params['k']
+    D = params['D']
+    Nstar = params['Nstar']
+    Nbar = params['Nbar']
+    sigma0 = params['sigma0']
+    sigmaI = params['sigmaI']
+    
+    # make sure nTot is size N, then find NQLL in real space
+    nTot = n[:N]
+    Nqll = ds.getNQLL(ifftnorm(nTot),Nstar,Nbar)
+    
+    # calc sigma M and transform
+    sigmaM = ds.getsigmaM(Nqll,[Nbar,Nstar,sigmaI,sigma0])
+    sigMk = fftnorm(sigmaM)
+
+    # calc dnT and return as array
+    dnT = nTotRHS_1var(nTot,nu_kin_mlyperus,sigMk,k,D,Nstar)
+    RHS = np.array(dnT)
+    return RHS
+

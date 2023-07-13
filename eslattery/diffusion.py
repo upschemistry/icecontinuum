@@ -11,53 +11,6 @@ from sklearn.utils import Bunch#,guvectorize
 
 prll_1d = False # 1d faster without parallelization
 prll_2d = True  # 2d faster with parallelization
-
-
-# def rk4_solver(f, t_span, y0, args=None) -> dict:
-#         ## get args if possible
-
-#         t0,tf = map(float,t_span)
-
-#         if args is not None:
-#             try:
-#                 _ = [*(args)]
-#             except TypeError as exp:
-#                 suggestion_tuple = (
-#                     "Supplied 'args' cannot be unpacked. Please supply `args`"
-#                     f" as a tuple (e.g. `args=({args},)`)"
-#                 )
-#                 raise TypeError(suggestion_tuple) from exp
-#             def fun(t, x, fun=f):
-#                 return fun(t, x, *args)
-        
-        
-#         ts = [t0]
-#         ys = [y0]
-        
-#         while t0 < tf:
-#             solver = rk4(fun, t0, y0, tf)
-
-#             t0 = solver[1]
-#             y0 = solver[2]
-#             ts.append(t0)
-#             ys.append(y0)
-
-#         ts = np.array(ts)
-#         ys = np.vstack(ys).T
-#         return ts,ys
-
-# def rk4(fun, t, y, h):
-#     k1 = h*fun(t,y)
-#     k2 = h*fun(t+h/2,y+k1/2)
-#     k3 = h*fun(t+h/2,y+k2/2)
-#     k4 = h*fun(t+h,y+k3)
-#     k = (k1+2*k2+2*k3+k4) / 6
-
-#     y_new = y + k
-#     t_new = t + h
-#     # f_new = fun(t + h, y_new)
-
-#     return t, t_new, y_new
         
 
 # @njit("f8[:](f8,f8[:],f8[:],i4)")

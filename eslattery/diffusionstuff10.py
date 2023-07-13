@@ -127,7 +127,9 @@ def f1d_1var(y, t, params):
     NQLL0 = getNQLL(Ntot0,Nstar,Nbar)
     sigma_m = getsigmaM(NQLL0,[Nbar,Nstar,sigmaI,sigma0])
     dNtot_dt = nu_kin_mlyperus * sigma_m
-    
+
+    # print(Nstar * 2*np.pi * dNtot_dt * np.cos(2*np.pi*Ntot0))[:10]
+
     # Diffusion
     dy = np.zeros(np.shape(NQLL0))
     for i in range(1,len(NQLL0)-1):
@@ -145,3 +147,24 @@ def f1d_solve_ivp(t, y, params):
 
 def f1d_solve_ivp_1var(t, y, params):
     return f1d_1var(y,t,params)
+
+def f1d_solve_ivp_1var_QLL(t,y,params):
+    Nbar, Nstar, sigmaI, sigma0, nu_kin_mlyperus, Doverdeltax2, nx = params
+    Nqll0 = y      # unpack current value of y
+    
+    # Deposition
+    sigma_m = getsigmaM(Nqll0,[Nbar,Nstar,sigmaI,sigma0])
+    dNqll = - 2*np.pi*nu_kin_mlyperus*sigma_m * np.sqrt(Nstar**2 - (Nbar - Nqll0)**2) ##THIS IS WRONG FIX IT
+    # print(dNqll)
+    
+    # Diffusion
+    dy = np.zeros(np.shape(Nqll0))
+    for i in range(1,len(Nqll0)-1):
+        dy[i] = Doverdeltax2*(Nqll0[i-1]-2*Nqll0[i]+Nqll0[i+1])
+    dy[0]  = Doverdeltax2*(Nqll0[-1] -2*Nqll0[0] +Nqll0[1]) 
+    dy[-1] = Doverdeltax2*(Nqll0[-2] -2*Nqll0[-1]+Nqll0[0])
+    dNqll += dy
+
+    # Package for output
+    derivs = list(dNqll)
+    return derivs
