@@ -148,15 +148,29 @@ def f1d_solve_ivp(t, y, params):
 def f1d_solve_ivp_1var(t, y, params):
     return f1d_1var(y,t,params)
 
+
+
 def f1d_solve_ivp_1var_QLL(t,y,params):
     Nbar, Nstar, sigmaI, sigma0, nu_kin_mlyperus, Doverdeltax2, nx = params
     Nqll0 = y      # unpack current value of y
-    
+    dNqll = np.zeros(len(Nqll0))
+
     # Deposition
     sigma_m = getsigmaM(Nqll0,[Nbar,Nstar,sigmaI,sigma0])
-    dNqll = - 2*np.pi*nu_kin_mlyperus*sigma_m * np.sqrt(Nstar**2 - (Nbar - Nqll0)**2) ##THIS IS WRONG FIX IT
-    # print(dNqll)
+    dNqll = 2*np.pi*Nstar*nu_kin_mlyperus*sigma_m * (np.cos(np.arcsin((Nbar - Nqll0)/Nstar))) ##np.sqrt(Nstar**2 - (Nbar - Nqll0)**2)/Nstar ##THIS IS WRONG FIX IT
     
+    # Correct arcsin limitations
+    for i in range (0,int(len(dNqll)/2)):
+        if Nqll0[i-1] - Nqll0[i] > 0:
+            dNqll[i] = -dNqll[i]
+    for i in range (int(len(dNqll)/2),len(dNqll)-1):
+        if Nqll0[i-1] - Nqll0[i] < 0:
+            dNqll[i] = -dNqll[i]
+    # Correct center point to follow surrounding points
+    n = int(len(dNqll)/2)
+    if dNqll[n-1] < 0 and dNqll[n+1] < 0:
+        dNqll[n] = -dNqll[n]
+
     # Diffusion
     dy = np.zeros(np.shape(Nqll0))
     for i in range(1,len(Nqll0)-1):
