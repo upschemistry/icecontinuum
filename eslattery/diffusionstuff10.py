@@ -325,8 +325,6 @@ def f1d_solve_ivp_1var_QLL(t,y,params):
              Dictionary containing all relevant parameters (see below)
         Nbar : float, best fit parameter to match intercept of NQLL(Ntot)
         Nstar : float, best fit parameter to match amplitude of NQLL(Ntot)
-        # sigmaI : 1D Numpy Array (N,), TODO
-        # sigma0 : float, TODO
         nu_kin_mlyperus : float, deposition rate in monolayers per microsecond
         Doverdeltax2 : float, numerically calculated D nabla (diffusion coefficient / x^2)
         # nx : int, discritization of x, NQLL, and Ntot arrays
@@ -361,11 +359,6 @@ def f1d_solve_ivp_1var_QLL(t,y,params):
     for i in range (n-1, n+1):
         if dNqll[i-1] < 0 and dNqll[i+3] < 0:
             dNqll[i] = -dNqll[i]
-    # Correct endpoints
-    if dNqll[1] < 0:
-        dNqll[0] = -dNqll[0]
-    if dNqll[-2] < 0:
-        dNqll[-1] = -dNqll[-1]
 
     # Diffusion
     dy = np.zeros(np.shape(Nqll0))
@@ -374,6 +367,17 @@ def f1d_solve_ivp_1var_QLL(t,y,params):
     dy[0]  = Doverdeltax2*(Nqll0[-1] -2*Nqll0[0] +Nqll0[1]) 
     dy[-1] = Doverdeltax2*(Nqll0[-2] -2*Nqll0[-1]+Nqll0[0])
     dNqll += dy
+
+    # Correct endpoints
+    if Nqll0[2] - Nqll0[1] > 0 and Nqll0[0] > Nqll0[1]: #increasing slope, initial point is bigger than next
+        dNqll[0] = -dNqll[0]
+    if Nqll0[2] - Nqll0[1] < 0:# and dNqll[0] > 0:# and dNqll[0] < abs(dNqll[1]): #decreasing slope, force somehow???? second boolean isn't always right :(
+        dNqll[0] = -dNqll[0]
+
+    if Nqll0[-3] - Nqll0[-2] < 0 and Nqll0[-1] > Nqll0[-2]: #decreasing slope, final point is bigger than last
+        dNqll[-1] = -dNqll[-1]
+    elif Nqll0[-3] - Nqll0[-2] < 0 and Nqll0[-1] < abs(Nqll0[-2]): #increasing slope, another somehow force that isnt always right.....
+        dNqll[-1] = -dNqll[-1]
 
     # Package for output
     derivs = list(dNqll)
