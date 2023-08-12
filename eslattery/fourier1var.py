@@ -10,6 +10,7 @@ import numpy as np
 from scipy.integrate import solve_ivp
 
 
+
 def fftnorm(u_full):
     """Computes normalized FFT (such that FFT and IFFT are symmetrically normalized)
     
@@ -26,6 +27,7 @@ def fftnorm(u_full):
 
     normalizedFFT = np.fft.rfft(u_full,norm = "forward")
     return normalizedFFT
+
 
 def ifftnorm(u_full):
     """Computes normalized IFFT (such that FFT and IFFT are symmetrically normalized)
@@ -69,21 +71,23 @@ def nQLLRHS(nQLLk,sigMk,params):
         Array containing derivative of nQLL wrt t, in k space
     """
 
+    # unpack necessary params
     D = params['D']
     nu_kin_mlyperus = params['nu_kin_mlyperus']
     Nstar = params['Nstar']
     Nbar = params['Nbar']
     k = params['k']
 
+    # get real stuff for comparisons... not a fan of forcing conditions but unable to figure something else out thus far
     Nqll = ifftnorm(nQLLk)
-    convReal = ifftnorm(sigMk) * np.sqrt(Nstar**2 - (Nbar - Nqll)**2)##np.cos(np.arcsin((Nbar - Nqll)/Nstar))##(np.cos(np.arcsin((Nbar - ifftnorm(nQLLk))/Nstar)))) * Nstar
+    convReal = ifftnorm(sigMk) * (np.sqrt(Nstar**2 - (Nbar - Nqll)**2))##(np.cos(np.arcsin((Nbar - ifftnorm(nQLLk))/Nstar)))) * Nstar
     
     n = int(len(Nqll)/2)
     for i in range (1,n-1):
-        if Nqll[i-1] - Nqll[i] > 0:
+        if Nqll[i-1] - Nqll[i] > 0.0000000001:
             convReal[i] = -convReal[i]
-    for i in range (n+1,len(Nqll)-1):
-        if Nqll[i] - Nqll[i+1] < 0:
+    for i in range (n+1,2*n-1):
+        if Nqll[i] - Nqll[i+1] < -0.0000000001:
             convReal[i] = -convReal[i]
     # Correct center points to follow surrounding points
     for i in range (n-1, n+1):
@@ -91,30 +95,20 @@ def nQLLRHS(nQLLk,sigMk,params):
             convReal[i] = -convReal[i]
     # Correct endpoints to follow leading points
     # Index 0
-    if convReal[0] > 0 and convReal[1] < 0 and convReal[1]-convReal[2] < 0: # positive slope and next point is below zero so first must also
+    if Nqll[2] - Nqll[1] > 0 and Nqll[0] > Nqll[1]: #increasing slope, initial point is bigger than next
         convReal[0] = -convReal[0]
-    if -convReal[0]-convReal[1] > 0 and convReal[1]-convReal[2] > 0: # 
+    if Nqll[2] - Nqll[1] < 0: #decreasing slope
         convReal[0] = -convReal[0]
     # Index -1
-    if convReal[-1] > 0 and convReal[-2] < 0 and convReal[-2]-convReal[-3] < 0: # positive slope and prior point is below zero
+    if Nqll[-3] - Nqll[-2] > 0 and Nqll[-1] > Nqll[-2]: #decreasing slope, final point is bigger than last
         convReal[-1] = -convReal[-1]
-    if -convReal[-1]-convReal[-2] > 0 and convReal[-2]-convReal[-3] > 0:
+    if Nqll[-3] - Nqll[-2] < 0: #increasing slope
         convReal[-1] = -convReal[-1]    
         
     # Add to transformed diffusion
     dnQLL = - k**2 * D*nQLLk + 2*np.pi*nu_kin_mlyperus * fftnorm(convReal)
-
-    ###
-    # tester(dnQLL,Nqll,params) # tester function to determine error as sim progresses
-    ###
     return dnQLL
     
-def tester(dnQ,Nq,params):
-    dNq = ds.f1d_solve_ivp_1var_QLL(0,Nq,params)
-    print('dnQ - dNq : ',ifftnorm(dnQ) - dNq)
-
-
-
 
 def RHS(t,n,params):
     """Computes the RHS for the 1 variable system. For use in solver.
@@ -126,7 +120,9 @@ def RHS(t,n,params):
     n : Numpy array (N,)
         Current state vector of positive modes (only total)   
     params : Dictionary
-             Dictionary of relevant parameters, see Parameter params for getsigmaM and nQLLRHS
+             Dictionary of relevant parameters (see below)
+        Nstar : float, best fit amplitude for sinusoidal NQLL(Ntot)
+        Nbar : float, best fit intercept for sinusoidal NQLL(Ntot)
 
     Returns
     -------
@@ -141,7 +137,7 @@ def RHS(t,n,params):
     # calc sigma M and transform
     sigmaM = ds.getsigmaM(Nqll,params)
     sigMk = fftnorm(sigmaM)
-
+    
     # calc dnQLL/dt in k space and return as array
     dnQ = nQLLRHS(nQLL,sigMk,params)
     RHS = np.array(dnQ)
@@ -156,6 +152,11 @@ def runSim(params):
     params : Dictionary
              Dictionary of relevant parameters (see below)
         N : float, number of positive modes in simulation
+        nu_kin_mlyperus : float, speed of water vapor hitting qll layer in monolayers per microsecond
+        sigma0 : 
+        sigmaI : 
+        k : 1D Numpy array (N,), array of available wavenumbers
+        D : float, diffusion coefficient
         Nstar : float, best fit amplitude for sinusoidal NQLL(Ntot)
         Nbar : float, best fit intercept for sinusoidal NQLL(Ntot)
         tinterval : 1D Numpy array (N,), timesteps for solver
@@ -164,7 +165,7 @@ def runSim(params):
     Returns
     -------
     uSim : ODE solver output
-           Output solution from sp.integrate.solve_ivp (includes state vector at all timesteps, time vector, etc.)
+           Output solution from sp.integrate.solve_ivp with method RK45 (includes state vector at all timesteps, time vector, etc.)
     """
     
     # unpack parameters from dictionary
@@ -183,7 +184,7 @@ def runSim(params):
         return out
 
     # Call the ODE solver
-    solv = solve_ivp(fun=myRHS, t_span=[tinterval[0],tinterval[-1]], y0=n, t_eval = tinterval, rtol=1e-12, method=odemethod)
+    solv = solve_ivp(fun=myRHS, t_span=[tinterval[0],tinterval[-1]], y0=n, t_eval = tinterval, rtol=1e-12, method='RK45')
     ykeep_ft = solv.y
     tkeep_ft = solv.t
     return [ykeep_ft,tkeep_ft]
@@ -199,7 +200,16 @@ def makeReal(fourierSol,params):
     params : Dictionary
              Dictionary of relevant parameters (see below)
         N : float, number of positive modes in simulation
-
+        nu_kin_mlyperus : float, speed of water vapor hitting qll layer in monolayers per microsecond (unused explicitly here)
+        sigma0 : (unused explicitly here)
+        sigmaI : (unused explicitly here)
+        k : 1D Numpy array (N,), array of available wavenumbers (unused explicitly here)
+        D : float, diffusion coefficient (unused explicitly here)
+        Nstar : float, best fit amplitude for sinusoidal NQLL(Ntot) (unused explicity here)
+        Nbar : float, best fit intercept for sinusoidal NQLL(Ntot) (unused explicitly here)
+        tinterval : 1D Numpy array (N,), timesteps for solver (unused explicitly here)
+        ICNT : 1D Numpy array (N,), initial total thickness of qll and ice layers (unused explicitly here)
+    
     Returns
     -------
     Nqll : 2D Numpy array (somesize)
@@ -207,11 +217,9 @@ def makeReal(fourierSol,params):
     """
 
     N = params['N']
-
     timesteps = fourierSol.shape[1]
 
     Nqll = np.zeros((timesteps,2*N-2))
     for i in range(timesteps):
-        Nqll[i,:] = ifftnorm(fourierSol[:,i])
-        
+        Nqll[i,:] = ifftnorm(fourierSol[:,i])        
     return Nqll

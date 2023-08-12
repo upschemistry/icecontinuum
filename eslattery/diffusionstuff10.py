@@ -4,9 +4,12 @@ Created on Tue Jul 14 15:01:47 2015
 @author: nesh, jonathan
 @author: ella (as of 2023)
 """
+
 import numpy as np
 import copy
-    
+
+
+
 def getNQLL(Ntot,Nstar,Nbar):
     """Calculates NQLL at a given Ntot
 
@@ -37,13 +40,13 @@ def getsigmaM(N,params,isNqll=True):
              Dictionary containing relevant parameters (see below)
         Nbar : float, best fit parameter to match intercept of NQLL(Ntot)
         Nstar : float, best fit parameter to match amplitude of NQLL(Ntot)
-        sigmaI : 1D Numpy Array (N,), TODO
-        sigma0 : 1D Numpy Array (N,), TODO
+        sigmaI : 1D Numpy Array (N,), supersaturation across facet?
+        sigma0 : 1D Numpy Array (N,), 
     
     Returns
     -------
     sigmaM : 1D Numpy Array (N,)
-        TODO
+        Microscopic supersaturation adjusted across a facet?
     """
     
     # unpack params
@@ -60,30 +63,7 @@ def getsigmaM(N,params,isNqll=True):
 
     m = (Nqll - (Nbar - Nstar))/(2*Nstar)    
     return (sigmaI - m * sigma0)/(1+m*sigma0)
-    
-def f1d_sigma_m(y, t, params):
-    """Calculates sigma M for 2 variable system??
-    
-    Parameters
-    ----------
-    y : 1D Numpy Array
-        TODO
-    t : float
-        Only used in integrator
 
-    Returns
-    -------
-    sigmaM : 1D Numpy Array
-        TODO
-    """
-    
-    Nbar, Nstar, sigmaI, sigma0, nu_kin_mlyperus, Doverdeltax2, nx = params
-    NQLL0, Ntot0 = np.reshape(y,(2,nx))      # unpack current values of y
-    
-    # Deposition
-    m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
-    sigma_m = (sigmaI - m * sigma0)/(1+m*sigma0)
-    return sigma_m
 
 def getsigmaI(x,xmax,center_reduction,sigmaIcorner,method='sinusoid'):
     """Calculates sigma I using the passed method, either sinusoid or parabolic
@@ -143,7 +123,6 @@ def f0d(y, t, myparams):
 
     # Deposition
     twopi = 2*np.pi
-    # sigma_m = getsigmaM(NQLL0,[Nbar,Nstar,sigmaI,sigma0])
     sigma_m = getsigmaM(NQLL0,myparams)
     depsurf = nu_kin_mlyperus * sigma_m
 
@@ -341,18 +320,18 @@ def f1d_solve_ivp_1var_QLL(t,y,params):
     Doverdeltax2 = params['Doverdeltax2']
     
     Nqll0 = y      # unpack current value of y
-    dNqll = np.zeros(len(Nqll0))
 
     # Deposition
     sigma_m = getsigmaM(Nqll0,params)
-    dNqll = 2*np.pi*nu_kin_mlyperus*sigma_m * np.sqrt(Nstar**2 - (Nbar - Nqll0)**2)##Nstar*(np.cos(np.arcsin((Nbar - Nqll0)/Nstar))) ##THIS IS WRONG FIX IT
     
-    # Correct arcsin limitations
-    for i in range (0,int(len(dNqll)/2)-1):
-        if Nqll0[i-1] - Nqll0[i] > 0:
-            dNqll[i] = -dNqll[i]
+    dNqll = 2*np.pi*nu_kin_mlyperus*sigma_m * (np.sqrt(Nstar**2 - (Nbar - Nqll0)**2))##THIS keeps getting Overflow or Invalid Value warnings when fed to solve_ivp
+    
+    # # Correct arcsin limitations
+    for i in range (1,int(len(dNqll)/2)-1):
+        if Nqll0[i-1] - Nqll0[i] > 0.0000000001: #decreasing slope in nqll, specified bound because it kept messing up 
+            dNqll[i] = -dNqll[i]                 #initial conditions with a 0 slop for nqll
     for i in range (int(len(dNqll)/2)+1,len(dNqll)-1):
-        if Nqll0[i-1] - Nqll0[i] < 0:
+        if Nqll0[i-1] - Nqll0[i] < -0.0000000001:#increasing slop in nqll, same but opposite bound as above
             dNqll[i] = -dNqll[i]
     # Correct center point to follow surrounding points
     n = int(len(dNqll)/2)
@@ -360,7 +339,7 @@ def f1d_solve_ivp_1var_QLL(t,y,params):
         if dNqll[i-1] < 0 and dNqll[i+3] < 0:
             dNqll[i] = -dNqll[i]
 
-    # Diffusion
+    # Diffusion, has always worked and matches -k^2 term in transform
     dy = np.zeros(np.shape(Nqll0))
     for i in range(1,len(Nqll0)-1):
         dy[i] = Doverdeltax2*(Nqll0[i-1]-2*Nqll0[i]+Nqll0[i+1])
@@ -371,12 +350,12 @@ def f1d_solve_ivp_1var_QLL(t,y,params):
     # Correct endpoints
     if Nqll0[2] - Nqll0[1] > 0 and Nqll0[0] > Nqll0[1]: #increasing slope, initial point is bigger than next
         dNqll[0] = -dNqll[0]
-    if Nqll0[2] - Nqll0[1] < 0:# and dNqll[0] > 0:# and dNqll[0] < abs(dNqll[1]): #decreasing slope, force somehow???? second boolean isn't always right :(
+    if Nqll0[2] - Nqll0[1] < 0:                         #decreasing slope
         dNqll[0] = -dNqll[0]
 
-    if Nqll0[-3] - Nqll0[-2] < 0 and Nqll0[-1] > Nqll0[-2]: #decreasing slope, final point is bigger than last
+    if Nqll0[-3] - Nqll0[-2] > 0 and Nqll0[-1] > Nqll0[-2]: #decreasing slope, final point is bigger than last
         dNqll[-1] = -dNqll[-1]
-    elif Nqll0[-3] - Nqll0[-2] < 0 and Nqll0[-1] < abs(Nqll0[-2]): #increasing slope, another somehow force that isnt always right.....
+    elif Nqll0[-3] - Nqll0[-2] < 0:                         #increasing slope
         dNqll[-1] = -dNqll[-1]
 
     # Package for output
