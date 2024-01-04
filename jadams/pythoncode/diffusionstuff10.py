@@ -123,7 +123,7 @@ def f1d_solve_ivp(t, y, params):
     m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
     sigma_m = (sigmaI - m * sigma0)/(1+m*sigma0)
     depsurf = nu_kin_mlyperus * sigma_m
-    dNQLL_dt = -depsurf*Nstar*twopi/Nbar*np.cos(twopi*Ntot0)
+    dNQLL_dt = -depsurf*Nstar*twopi/Nbar*np.cos(twopi*Ntot0) # Why is Nbar here? Seems like it shouldn't be
     dNtot_dt =  depsurf
     
     # Diffusion
