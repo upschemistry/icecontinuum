@@ -20,7 +20,7 @@ def getNQLL(Ntot,Nstar,Nbar):
     
 @njit
 def getDeltaNQLL(Ntot,Nstar,Nbar,NQLL):
-    return getNQLL(Ntot,Nstar,Nbar)-NQLL
+    return NQLL-getNQLL(Ntot,Nstar,Nbar)
 
 @njit
 def f1d_sigma_m(y, t, params):
@@ -58,7 +58,7 @@ def f0d_solve_ivp(t, y, myparams):
     dNtot_dt = depsurf
     
     # NQLL
-    dNQLL_dt = dNtot_dt + getDeltaNQLL(Ntot0,Nstar,Nbar,NQLL0)/tau_eq
+    dNQLL_dt = dNtot_dt - getDeltaNQLL(Ntot0,Nstar,Nbar,NQLL0)/tau_eq
     
     # Packaging up for output
     derivs = [dNQLL_dt, dNtot_dt]
@@ -85,7 +85,6 @@ def f1d_solve_ivp(t, y, scalar_params, sigmaI):
     # Ntot deposition
     twopi = 2*np.pi
     m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
-#     sigma_m = (sigmaI - m * sigma0)/(1+m*sigma0)*0.997-0.0002
     sigma_m = (sigmaI - m * sigma0)/(1+m*sigma0)
     depsurf = nu_kin_mlyperus * sigma_m
     dNtot_dt = depsurf
@@ -101,7 +100,7 @@ def f1d_solve_ivp(t, y, scalar_params, sigmaI):
     dNtot_dt += dy
 
     # NQLL    
-    dNQLL_dt = dNtot_dt + getDeltaNQLL(Ntot0,Nstar,Nbar,NQLL0)/tau_eq
+    dNQLL_dt = dNtot_dt - getDeltaNQLL(Ntot0,Nstar,Nbar,NQLL0)/tau_eq
     
     # Package for output
     derivs = np.empty(2*l)
