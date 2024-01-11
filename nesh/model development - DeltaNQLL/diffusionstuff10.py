@@ -85,6 +85,8 @@ def f1d_solve_ivp(t, y, scalar_params, sigmaI):
     # Ntot deposition
     twopi = 2*np.pi
     m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
+#     sigmaI_correction = -m * sigmaI * 2.1
+#     sigma_m = (sigmaI +sigmaI_correction - m * sigma0)/(1+m*sigma0)
     sigma_m = (sigmaI - m * sigma0)/(1+m*sigma0)
     depsurf = nu_kin_mlyperus * sigma_m
     dNtot_dt = depsurf
