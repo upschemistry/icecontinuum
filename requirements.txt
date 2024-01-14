@@ -1,5 +1,0 @@
-numba
-numpy
-matplotlib
-plotly
-scipy
