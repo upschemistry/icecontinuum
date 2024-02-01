@@ -3,7 +3,14 @@ from copy import copy as cp
 import matplotlib.pylab as plt
 from scipy.integrate import solve_ivp
 from numba import njit, float64, int32, types
+from matplotlib import rcParams
 
+
+ticklabelsize = 15
+linewidth = 2
+fontsize = 15
+color = 'k'
+markersize = 10
 
 @njit
 def propagate_vaporfield_Euler(u0,ixbox,iybox,udirichlet,uneumannx,uneumanny,Dxeff,Dyeff):
@@ -72,19 +79,23 @@ def solve_ivp_VF2d(t, y, slice_params, integer_params, float_params):
     dun_dt = np.reshape(dun_dt,(nx*ny,))
     return dun_dt
 
-def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,AssignQuantity,verbose=0,Integration_method='Euler',tmax=0):
+def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,AssignQuantity,verbose=0,Integration_method='Euler',tmax=0, dt=0):
     
     # Times
     if tmax == 0:
         tmax = AssignQuantity(0.5,'microsecond')
 
     # Box size
-    nx = 353
-    ny = 355
+    nx = 151
+    ny = 151
     xmax = AssignQuantity(1000,'micrometer')
     ymax = AssignQuantity(1000,'micrometer')
-    x = np.linspace(0,xmax,nx); dx = x[1]-x[0]; print('dx', dx)
-    y = np.linspace(0,ymax,ny); dy = y[1]-y[0]; print('dy',dy)
+    x = np.linspace(0,xmax,nx); dx = x[1]-x[0]
+    if verbose>0:
+        print('dx', dx)
+    y = np.linspace(0,ymax,ny); dy = y[1]-y[0]
+    if verbose>0:
+        print('dy',dy)
     dx2 = dx**2
     dy2 = dy**2
     nxmid = int(nx/2); # print('nxmid =', nxmid); # print('x(nxmid) =',x[nxmid])
@@ -97,11 +108,21 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,AssignQuantity,ver
     D = getDofTP(Temperature,Pressure,AssignQuantity)
 
     # Getting a suitable time step
-    dt = (dx2+dy2)/D/10; print('dt = ', dt)
+    if dt == 0:
+        dt = (dx2+dy2)/D/10
+        if verbose>0:
+            print('Using the default dt =', dt)
+    else:
+        if verbose>0:
+            print('Using the user-specified dt =',dt)
 
     # Computing effective diffusion coefficents (without dt)
-    Dxeff = D/dx2; print('Dxeff = ', Dxeff)
-    Dyeff = D/dy2; print('Dyeff = ', Dyeff)
+    Dxeff = D/dx2
+    if verbose>0:
+        print('Dxeff = ', Dxeff)
+    Dyeff = D/dy2
+    if verbose>0:   
+        print('Dyeff = ', Dyeff)
     
     # Calculating the Neumann condition at the vapor/ice boundary (starting with ice density)
     rho_ice = AssignQuantity(0.9,'g/cm^3')
@@ -111,26 +132,31 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,AssignQuantity,ver
     # Neumann (w/o dt)
     uneumannx = rho_ice*g_ice*R*Temperature/(Mvap*dy); uneumannx.ito('pascal/microsecond')
     uneumanny = rho_ice*g_ice*R*Temperature/(Mvap*dx); uneumanny.ito('pascal/microsecond')
-    print('uneumannx = ',uneumannx)
-    print('uneumanny = ',uneumanny)
+    if verbose>0:
+        print('uneumannx = ',uneumannx)
+        print('uneumanny = ',uneumanny)
     
     # Converting this into pressures
     P3 = AssignQuantity(611,'Pa')
     T3 = AssignQuantity(273,'kelvin')
     Delta_H_sub = AssignQuantity(50,'kJ/mol')
-    P_vapor_eq = P3*np.exp(-Delta_H_sub/R*(1/Temperature-1/T3)); print('Vapor pressure at this temperature = ', P_vapor_eq)
+    P_vapor_eq = P3*np.exp(-Delta_H_sub/R*(1/Temperature-1/T3))
+    if verbose > 0:
+        print('Vapor pressure at this temperature = ', P_vapor_eq)
 
     # Dirichlet conditions at the far-field boundary
     udirichlet = P_vapor_eq*(sigmaI_far_field+1)
-    print('udirichlet = ', udirichlet)
+    if verbose > 0:
+        print('udirichlet = ', udirichlet)
     
     # Shape of the crystal
     aspect_ratio = 1
     
     # Calculating how many time steps we'll do
     ntimes = int(tmax/dt)
-    print('Integrating steps = ', ntimes)
-    print('Integrating out to ', ntimes*dt) # This is a check -- it should be very close to the tmax specified above
+    if verbose > 0:
+        print('Integrating steps = ', ntimes)
+        print('Integrating out to ', ntimes*dt) # This is a check -- it should be very close to the tmax specified above
 
     # Define the box inside
     Ldesiredx = Ldesired # Doesn't always work out to this because the grid is discretized
@@ -203,10 +229,6 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,AssignQuantity,ver
         float_params = \
              np.array([udirichlet.magnitude, uneumannx.magnitude, uneumanny.magnitude, Dxeff.magnitude, Dyeff.magnitude])
         
-        # Testing the derivative function ...
-#         print('calling solve_ivp_VF2d ...')
-#         solve_ivp_VF2d(0.0, ylast, slice_params, integer_params, float_params)
-
         # Integrating
         tinterval = [0.0,tmax.magnitude]
         print('calling solve_ivp ...')
@@ -236,9 +258,6 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,AssignQuantity,ver
 
     # Reporting
     if verbose > 1:
-        # Time reporting
-        print('dt, tmax = ',dt, dt*ntimes)
-
 
         # Plotting from far afield up to the box
         iextend = 6
@@ -375,3 +394,250 @@ def fillin(un,ixbox,iybox,overrideflag=0,overrideval=0):
     un[ixbox,iybox] = border
     return un
 
+def getsigma_m(NQLL0,Nbar,Nstar,sigmaI,sigma0):
+    twopi = 2*np.pi
+    m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
+    sigma_m = (sigmaI - m * sigma0)
+    return sigma_m
+
+@njit
+def getNQLL(Ntot,Nstar,Nbar):
+    return Nbar - Nstar*np.sin(2*np.pi*Ntot)
+    
+@njit
+def getDeltaNQLL(Ntot,Nstar,Nbar,NQLL):
+    return NQLL-getNQLL(Ntot,Nstar,Nbar)
+
+@njit
+def f1d_sigma_m(y, t, params):
+    Nbar, Nstar, sigmaI, sigma0, nu_kin_mlyperus, Doverdeltax2, nx = params
+    NQLL0, Ntot0 = np.reshape(y,(2,nx))      # unpack current values of y
+    
+    # Deposition
+    m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
+    sigma_m = (sigmaI - m * sigma0)
+    return sigma_m
+
+@njit
+def getsigmaI(x,xmax,center_reduction,sigmaIcorner,method='sinusoid'):
+    sigmapfac = 1-center_reduction/100
+    xmid = max(x)/2
+    if method == 'sinusoid':
+        fsig = (np.cos(x/xmax*np.pi*2)+1)/2*(1-sigmapfac)+sigmapfac
+    elif method == 'parabolic':
+        fsig = (x-xmid)**2/xmid**2*(1-sigmapfac)+sigmapfac
+    else:
+        print('bad method')
+    return fsig*sigmaIcorner
+    
+# 
+
+@njit("f8[:](f8,f8[:],f8[:],f8[:])")
+def f1d_solve_ivp(t, y, scalar_params, sigmaI):
+    Nbar, Nstar, sigma0, nu_kin_mlyperus, DoverdeltaX2, tau_eq = scalar_params
+    l = int(len(y)/2)
+    NQLL0 = y[:l]
+    Ntot0 = y[l:]
+    
+    # Ntot deposition
+    twopi = 2*np.pi
+    m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
+    sigma_m = (sigmaI - m * sigma0)
+    depsurf = nu_kin_mlyperus * sigma_m
+    dNtot_dt = depsurf
+
+    # Ntot diffusion
+    dy = np.empty(np.shape(NQLL0))
+    for i in range(1,len(NQLL0)-1):
+        dy[i] = DoverdeltaX2*(NQLL0[i-1]-2*NQLL0[i]+NQLL0[i+1])
+    dy[0]  = DoverdeltaX2*(NQLL0[-1] -2*NQLL0[0] +NQLL0[1]) 
+    dy[-1] = DoverdeltaX2*(NQLL0[-2] -2*NQLL0[-1]+NQLL0[0])
+
+    # Combined
+    dNtot_dt += dy
+
+    # NQLL    
+    dNQLL_dt = dNtot_dt - getDeltaNQLL(Ntot0,Nstar,Nbar,NQLL0)/tau_eq
+    
+    # Package for output
+    derivs = np.empty(2*l)
+    derivs[:l] = dNQLL_dt
+    derivs[l:] = dNtot_dt
+
+    return derivs
+
+def run_f1d(\
+           NQLL_init_1D,Ntot_init_1D,times,\
+           Nbar, Nstar, sigma0, nu_kin_mlyperus, Doverdeltax2, tau_eq, sigmaI,\
+           AssignQuantity,\
+           verbose=0, odemethod='LSODA'):
+
+    """ Solves the QLC-2 problem. Branched from the code in diffusionstuff11.py, it has units """
+
+    # Bundle parameters for ODE solver
+    scalar_params = np.array([Nbar, Nstar, sigma0, nu_kin_mlyperus.magnitude, Doverdeltax2.magnitude, tau_eq.magnitude])
+
+    # Prep for the integration
+    nt = len(times)
+    nx = len(NQLL_init_1D)
+    ylast = np.array([NQLL_init_1D,Ntot_init_1D])
+    ylast = np.reshape(ylast,2*nx)
+    ykeep_1D = [ylast]
+    lastprogress = 0
+    sigmaI_mag = sigmaI.magnitude
+    
+    for i in range(0,nt-1):
+
+        # Specify the time interval of this step
+        tinterval = [times[i].magnitude,times[i+1].magnitude]
+        
+        if verbose > 0:
+            print(tinterval)
+            print(ylast)
+            print(scalar_params)
+            print(sigmaI_mag)
+            print(odemethod)
+        
+        # Integrate up to next time step
+        sol = solve_ivp(\
+            f1d_solve_ivp, tinterval, ylast, args=(scalar_params,sigmaI_mag),rtol=1e-12,method=odemethod)
+        ylast = sol.y[:,-1]
+        
+        # Stuff into keeper arrays
+        ykeep_1D.append(ylast)
+        
+        # Progress reporting
+        progress = int(i/nt*100)
+        if np.mod(progress,10) == 0:
+            if progress > lastprogress:
+                print(progress,'% done')
+                lastprogress = progress
+
+    print('100% done')
+    ykeep_1D = np.array(ykeep_1D, np.float64)
+    ykeep_1Darr = np.array(ykeep_1D, np.float64)
+    ykeep_1Darr_reshaped = np.reshape(ykeep_1Darr,(nt,2,nx))
+    Ntotkeep_1D = ykeep_1Darr_reshaped[:,1,:]
+    NQLLkeep_1D = ykeep_1Darr_reshaped[:,0,:]
+    
+    return Ntotkeep_1D, NQLLkeep_1D
+
+def get_D_of_T(T,AssignQuantity):
+    """ Based on a log/inverse T fit to Price's data for supercooled liquid water """
+    T_inverse_Temperature = 1e3/T; #print(T_inverse_Temperature)
+    p = [-2.74653072, 9.97737468]
+    logD = np.polyval(p,T_inverse_Temperature.magnitude)
+    D = AssignQuantity(np.exp(logD)*1e-5*100,'micrometers^2/microsecond')
+    return D
+
+
+def report_growth_results(x_QLC,tkeep_1Darr,NQLLkeep_1D,Ntotkeep_1D,Nicekeep_1D,nmpermonolayer,lastfraction=0):
+    
+    # Parameters of the data
+    ntimes = len(NQLLkeep_1D)
+    itime = -1 # This is the one we want to focus on
+    
+    # Plot ice and total profile
+    plt.figure()
+    plt.plot(x_QLC.magnitude, Nicekeep_1D[itime,:], 'k', label='ice', lw=linewidth)
+    plt.plot(x_QLC.magnitude, Ntotkeep_1D[itime,:], 'b', label='total', lw=linewidth)
+    plt.xlabel(r'$x (\mu m$)',fontsize=fontsize)
+    plt.ylabel(r'$ice \ & \ liquid \ layers$',fontsize=fontsize)
+    rcParams['xtick.labelsize'] = ticklabelsize 
+    rcParams['ytick.labelsize'] = ticklabelsize
+    plt.legend()
+    this_time = tkeep_1Darr[itime].to('millisecond')
+    title_time = "{:.0f}".format(this_time.magnitude)
+    plt.title(title_time+' '+str(this_time.units))
+    plt.grid('on')
+
+    # Plot liquid
+    plt.figure()
+    plt.plot(x_QLC.magnitude, NQLLkeep_1D[itime,:], 'b', label='liquid', lw=linewidth)
+    plt.xlabel(r'$x (\mu m$)',fontsize=fontsize)
+    plt.ylabel(r'$liquid \ layers$',fontsize=fontsize)
+    rcParams['xtick.labelsize'] = ticklabelsize 
+    rcParams['ytick.labelsize'] = ticklabelsize
+    plt.title(title_time+' '+str(this_time.units))
+    plt.grid('on')
+
+    # Plot number of steps over time
+    plt.figure()
+    rcParams['xtick.labelsize'] = ticklabelsize 
+    rcParams['ytick.labelsize'] = ticklabelsize
+    f = np.max(Ntotkeep_1D,axis=1) - np.min(Ntotkeep_1D,axis=1)
+    plt.plot(tkeep_1Darr.magnitude/1e3,f,lw=linewidth)
+    plt.xlabel(r't ($m s$)',fontsize=fontsize)
+    plt.ylabel('Number of steps',fontsize=fontsize)
+    plt.grid('on')
+
+    # Some analysis
+    if lastfraction == 0:
+        lastfraction = 0.3
+    itimes_almost_end = int(ntimes*(1-lastfraction))
+    icorner = 0
+    delta_N = Ntotkeep_1D[itime,icorner]-Ntotkeep_1D[itimes_almost_end,icorner]
+    delta_t = tkeep_1Darr[itime]-tkeep_1Darr[itimes_almost_end]
+    g_ice_QLC = delta_N/delta_t*nmpermonolayer; g_ice_QLC.ito('micrometer/second')
+    
+    return g_ice_QLC
+
+def getsigmaI(x,center_reduction,sigmaIcorner):
+    """ Assume x is already centered """
+    sigmapfac = 1-center_reduction/100
+#     xmid = max(x)/2
+    fsig = x**2*(1-sigmapfac)+sigmapfac
+    return fsig*sigmaIcorner
+
+# @njit
+# def f0d_solve_ivp(t, y, myparams):
+#     Nbar, Nstar, sigmaI, sigma0, nu_kin_mlyperus, tau_eq = myparams  # unpack parameters
+#     NQLL0 = y[0]
+#     Ntot0 = y[1]      # unpack current values of y
+
+#     # Ntot deposition
+#     twopi = 2*np.pi
+#     m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
+#     sigma_m = (sigmaI - m * sigma0)
+#     depsurf = nu_kin_mlyperus * sigma_m
+#     dNtot_dt = depsurf
+    
+#     # NQLL
+#     dNQLL_dt = dNtot_dt - getDeltaNQLL(Ntot0,Nstar,Nbar,NQLL0)/tau_eq
+    
+#     # Packaging up for output
+#     derivs = [dNQLL_dt, dNtot_dt]
+#     return derivs
+
+# def run_f0d(NQLL_init_0D,Ntot_init_0D,times,params,odemethod):
+#     # Call the ODE solver
+#     ylast = np.array([NQLL_init_0D,Ntot_init_0D])
+#     ykeep_0D = [ylast]
+#     lastprogress = 0
+
+#     nt = len(times)
+#     for i in range(0,nt-1):
+
+#         # Specify the time interval of this step
+#         tinterval = [times[i],times[i+1]]
+        
+#         # Integrate up to next time step
+#         sol = solve_ivp(f0d_solve_ivp, tinterval, ylast, dense_output=True, args=(params,),rtol=1e-12,method=odemethod)
+#         ylast = sol.y[:,-1]
+
+#         # Stuff into keeper arrays
+#         ykeep_0D.append(ylast)
+        
+#         # Progress reporting
+#         progress = int(i/nt*100)
+#         if np.mod(progress,10) == 0:
+#             if progress > lastprogress:
+#                 print(progress,'% done')
+#                 lastprogress = progress
+
+#     print('100% done')
+#     ykeep_0D = np.array(ykeep_0D, np.float64)
+#     NQLLkeep_0D = ykeep_0D[:,0]
+#     Ntotkeep_0D = ykeep_0D[:,1]
+
+#     return Ntotkeep_0D, NQLLkeep_0D 
