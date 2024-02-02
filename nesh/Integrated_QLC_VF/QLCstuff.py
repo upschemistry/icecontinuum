@@ -345,24 +345,30 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
     return [xshifted, sigmaDx], [yshifted, sigmaDy]
 
 def getDofTpow(T,AssignQuantity):
-    """ This produces D in micrometers^2/microsecond """
+    """ Returns D in micrometers^2/microsecond """
     """ Assumes temperature in degrees K """
-
+    """ Looks like three parameters, but actually D0 = np.exp(b)*T0**m """
+    """ Based on https://www.engineeringtoolbox.com/air-diffusion-coefficient-gas-mixture-temperature-d_2010.html """
     m = 1.86121271
     b = -7.35421981
-    T0 = 273
-    D0 = np.exp(b)*T0**m
+    T0 = 273.15
+    Do = 21.91612692493907
     D = (T.magnitude/T0)**m * D0
     D = AssignQuantity(D,'micrometers^2/microsecond')
     return D
 
 def getDofTP(T,P,AssignQuantity):
+    """ Returns D in micrometers^2/microsecond """
+    """ Assumes temperature in degrees K """
+    """ Based on https://www.engineeringtoolbox.com/air-diffusion-coefficient-gas-mixture-temperature-d_2010.html """
+    """ The pressure dependence is ~1/P """
     DofT = getDofTpow(T,AssignQuantity); # print(DofT)
     P0 = AssignQuantity(1,'atm') 
     D = DofT/(P.to('atm')/P0)
     return D
 
 def get_nu_kin(T,AssignQuantity):
+    """ Hertz-Knudsen deposition velocity """
 
     # Reference values
     P3 = AssignQuantity(611,'Pa')
@@ -391,7 +397,6 @@ def fillin(un,ixbox,iybox,overrideflag=0,overrideval=0):
     return un
 
 def getsigma_m(NQLL0,Nbar,Nstar,sigmaI,sigma0):
-    twopi = 2*np.pi
     m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
     sigma_m = (sigmaI - m * sigma0)
     return sigma_m
@@ -571,15 +576,16 @@ def run_f0d(NQLL_init_0D, Ntot_init_0D, times,\
     NQLLkeep_0D = ykeep_0D[:,0]
     Ntotkeep_0D = ykeep_0D[:,1]
 
-    return Ntotkeep_0D, NQLLkeep_0D 
-            
+    return Ntotkeep_0D, NQLLkeep_0D          
 
 def get_D_of_T(T,AssignQuantity):
     """ Based on a log/inverse T fit to Price's data for supercooled liquid water """
-    T_inverse_Temperature = 1e3/T; #print(T_inverse_Temperature)
-    p = [-2.74653072, 9.97737468]
-    logD = np.polyval(p,T_inverse_Temperature.magnitude)
-    D = AssignQuantity(np.exp(logD)*1e-5*100,'micrometers^2/microsecond')
+    E_a =  AssignQuantity(22.83465640608,'kilojoule / mole')
+    R = AssignQuantity(8.314e-3,'kjoule/mol/K')
+    T_o = AssignQuantity(273,'K')
+    D_o = AssignQuantity(0.0009201878841272197,'micrometer ** 2 / microsecond')    
+    arg_of_exp = -E_a/R * (1/T-1/T_o)
+    D = D_o * np.exp(arg_of_exp)
     return D
 
 def report_0d_growth_results(tkeep_0Darr,NQLLkeep_0D,Ntotkeep_0D,Nicekeep_0D,Nbar,Nstar,nmpermonolayer,graphics=True):
