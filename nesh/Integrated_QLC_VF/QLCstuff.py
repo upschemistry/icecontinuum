@@ -79,7 +79,8 @@ def solve_ivp_VF2d(t, y, slice_params, integer_params, float_params):
     dun_dt = np.reshape(dun_dt,(nx*ny,))
     return dun_dt
 
-def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,AssignQuantity,verbose=0,Integration_method='Euler',tmax=0, dt=0):
+def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
+         AssignQuantity,verbose=0,Integration_method='Euler',tmax=0, dt=0):
     
     # Times
     if tmax == 0:
@@ -98,7 +99,7 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,AssignQuantity,ver
         print('dy',dy)
     dx2 = dx**2
     dy2 = dy**2
-    nxmid = int(nx/2); # print('nxmid =', nxmid); # print('x(nxmid) =',x[nxmid])
+    nxmid = int(nx/2)
     nymid = int(ny/2)
     x = x-x[nxmid]
     y = y-y[nymid]
@@ -118,11 +119,9 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,AssignQuantity,ver
 
     # Computing effective diffusion coefficents (without dt)
     Dxeff = D/dx2
-    if verbose>0:
-        print('Dxeff = ', Dxeff)
+    if verbose>0: print('Dxeff = ', Dxeff)
     Dyeff = D/dy2
-    if verbose>0:   
-        print('Dyeff = ', Dyeff)
+    if verbose>0: print('Dyeff = ', Dyeff)
     
     # Calculating the Neumann condition at the vapor/ice boundary (starting with ice density)
     rho_ice = AssignQuantity(0.9,'g/cm^3')
@@ -141,13 +140,11 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,AssignQuantity,ver
     T3 = AssignQuantity(273,'kelvin')
     Delta_H_sub = AssignQuantity(50,'kJ/mol')
     P_vapor_eq = P3*np.exp(-Delta_H_sub/R*(1/Temperature-1/T3))
-    if verbose > 0:
-        print('Vapor pressure at this temperature = ', P_vapor_eq)
+    if verbose > 0: print('Vapor pressure at this temperature = ', P_vapor_eq)
 
     # Dirichlet conditions at the far-field boundary
     udirichlet = P_vapor_eq*(sigmaI_far_field+1)
-    if verbose > 0:
-        print('udirichlet = ', udirichlet)
+    if verbose > 0: print('udirichlet = ', udirichlet)
     
     # Shape of the crystal
     aspect_ratio = 1
@@ -171,7 +168,7 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,AssignQuantity,ver
     ixboxmax = nxmid+boxradx
     iyboxmin = nymid-boxrady
     iyboxmax = nymid+boxrady
-    print('    box length (y) = ', iyboxmax-iyboxmin)
+    if verbose > 0: print('    box length (y) = ', iyboxmax-iyboxmin)
 
     # Setting up to slice through the volume
     ixbox = slice(ixboxmin,ixboxmax)
@@ -196,7 +193,7 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,AssignQuantity,ver
 
     # Propagate forward a bunch of times
     if Integration_method == 'Euler':
-        print("Solving using "+Integration_method)
+        if verbose > 0: print("Solving using "+Integration_method)
         uneumannx_Euler_mag = uneumannx_mag*dt.magnitude
         uneumanny_Euler_mag = uneumanny_mag*dt.magnitude
         Dxeff_Euler_mag = Dxeff_mag*dt.magnitude
@@ -206,16 +203,16 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,AssignQuantity,ver
                un_mag,ixbox,iybox,udirichlet_mag,uneumannx_Euler_mag,uneumanny_Euler_mag,Dxeff_Euler_mag,Dyeff_Euler_mag)
 
     else:                
-        print("Solving using "+Integration_method)
+        if verbose > 0: print("Solving using "+Integration_method)
         # Dirichlet outer boundary
         un_mag[[0,-1],:]=udirichlet.magnitude
         un_mag[:,[0,-1]]=udirichlet.magnitude
         
         # This is the starting state
         ylast = np.reshape(un_mag,(nx*ny,1))
-        print('shape of ylast =', np.shape(ylast))
+        if verbose > 0: print('shape of ylast =', np.shape(ylast))
         ylast = np.squeeze(ylast)
-        print('shape of ylast =', np.shape(ylast))
+        if verbose > 0: print('shape of ylast =', np.shape(ylast))
         
         # Indices for the crystal inside
         ixmin = ixbox.start
@@ -231,7 +228,6 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,AssignQuantity,ver
         
         # Integrating
         tinterval = [0.0,tmax.magnitude]
-        print('calling solve_ivp ...')
         sol = solve_ivp(\
               solve_ivp_VF2d, tinterval, ylast, args=(slice_params, integer_params, float_params),\
               rtol=1e-8,method=Integration_method)
@@ -355,7 +351,7 @@ def getDofTpow(T,AssignQuantity):
     m = 1.86121271
     b = -7.35421981
     T0 = 273
-    D0 = np.exp(b)*T0**m; print('D0 = ', D0)
+    D0 = np.exp(b)*T0**m
     D = (T.magnitude/T0)**m * D0
     D = AssignQuantity(D,'micrometers^2/microsecond')
     return D
@@ -430,8 +426,6 @@ def getsigmaI(x,xmax,center_reduction,sigmaIcorner,method='sinusoid'):
         print('bad method')
     return fsig*sigmaIcorner
     
-# 
-
 @njit("f8[:](f8,f8[:],f8[:],f8[:])")
 def f1d_solve_ivp(t, y, scalar_params, sigmaI):
     Nbar, Nstar, sigma0, nu_kin_mlyperus, DoverdeltaX2, tau_eq = scalar_params
@@ -443,8 +437,7 @@ def f1d_solve_ivp(t, y, scalar_params, sigmaI):
     twopi = 2*np.pi
     m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
     sigma_m = (sigmaI - m * sigma0)
-    depsurf = nu_kin_mlyperus * sigma_m
-    dNtot_dt = depsurf
+    dNtot_dt = nu_kin_mlyperus * sigma_m
 
     # Ntot diffusion
     dy = np.empty(np.shape(NQLL0))
@@ -522,6 +515,65 @@ def run_f1d(\
     
     return Ntotkeep_1D, NQLLkeep_1D
 
+@njit
+def f0d_solve_ivp(t, y, scalar_params, sigmaIcorner):
+    Nbar, Nstar, sigma0, nu_kin_mlyperus, tau_eq = scalar_params  # unpack parameters
+    NQLL0 = y[0]
+    Ntot0 = y[1]      # unpack current values of y
+
+    # Ntot deposition
+    twopi = 2*np.pi
+    m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
+    sigma_m = (sigmaIcorner - m * sigma0)
+    dNtot_dt = nu_kin_mlyperus * sigma_m
+    
+    # NQLL
+    dNQLL_dt = dNtot_dt - getDeltaNQLL(Ntot0,Nstar,Nbar,NQLL0)/tau_eq
+    
+    # Packaging up for output
+    derivs = [dNQLL_dt, dNtot_dt]
+    return derivs
+
+def run_f0d(NQLL_init_0D, Ntot_init_0D, times,\
+            Nbar, Nstar, sigma0, nu_kin_mlyperus, tau_eq, sigmaI_corner,
+            verbose=0, odemethod='LSODA'):
+    
+    # Prep for the integration
+    scalar_params = np.array([Nbar, Nstar, sigma0, nu_kin_mlyperus.magnitude, tau_eq.magnitude])
+    ylast = np.array([NQLL_init_0D,Ntot_init_0D])
+    ykeep_0D = [ylast]
+    lastprogress = 0
+
+    nt = len(times)
+    for i in range(0,nt-1):
+
+        # Specify the time interval of this step
+        tinterval = [times[i].magnitude,times[i+1].magnitude]
+        
+        # Integrate up to next time step
+        sol = solve_ivp(\
+              f0d_solve_ivp, tinterval, ylast, dense_output=True, args=(scalar_params,sigmaI_corner.magnitude),\
+              rtol=1e-12,method=odemethod)
+        ylast = sol.y[:,-1]
+
+        # Stuff into keeper arrays
+        ykeep_0D.append(ylast)
+        
+        # Progress reporting
+        progress = int(i/nt*100)
+        if np.mod(progress,10) == 0:
+            if progress > lastprogress:
+                #print(progress,'% done')
+                lastprogress = progress
+
+    #print('100% done')
+    ykeep_0D = np.array(ykeep_0D, np.float64)
+    NQLLkeep_0D = ykeep_0D[:,0]
+    Ntotkeep_0D = ykeep_0D[:,1]
+
+    return Ntotkeep_0D, NQLLkeep_0D 
+            
+
 def get_D_of_T(T,AssignQuantity):
     """ Based on a log/inverse T fit to Price's data for supercooled liquid water """
     T_inverse_Temperature = 1e3/T; #print(T_inverse_Temperature)
@@ -530,8 +582,29 @@ def get_D_of_T(T,AssignQuantity):
     D = AssignQuantity(np.exp(logD)*1e-5*100,'micrometers^2/microsecond')
     return D
 
+def report_0d_growth_results(tkeep_0Darr,NQLLkeep_0D,Ntotkeep_0D,Nicekeep_0D,Nbar,Nstar,nmpermonolayer,graphics=True):
+    
+    # Growth statistics
+    delta_N = Ntotkeep_0D[-1]-Ntotkeep_0D[0]
+    delta_t = tkeep_0Darr[-1]-tkeep_0Darr[0]
+    g_ice_QLC = delta_N/delta_t*nmpermonolayer; g_ice_QLC.ito('micrometer/second')
+    
+    # Plot results
+    if graphics:
+        plt.figure()
+        rcParams['xtick.labelsize'] = ticklabelsize 
+        rcParams['ytick.labelsize'] = ticklabelsize
+        plt.plot(tkeep_0Darr.magnitude,NQLLkeep_0D,lw=linewidth,label='NQLL')
+        plt.plot(tkeep_0Darr.magnitude,NQLLkeep_0D-getNQLL(Ntotkeep_0D,Nstar,Nbar),lw=linewidth,label='NQLL bias')
+        plt.xlabel(r't ($\mu s$)',fontsize=fontsize)
+        plt.ylabel(r'$N_{QLL} $',fontsize=fontsize)
+        plt.grid('on')
+        plt.legend()
+    
+    return g_ice_QLC
 
-def report_growth_results(x_QLC,tkeep_1Darr,NQLLkeep_1D,Ntotkeep_1D,Nicekeep_1D,nmpermonolayer,lastfraction=0):
+
+def report_1d_growth_results(x_QLC,tkeep_1Darr,NQLLkeep_1D,Ntotkeep_1D,Nicekeep_1D,nmpermonolayer,lastfraction=0):
     
     # Parameters of the data
     ntimes = len(NQLLkeep_1D)
@@ -589,55 +662,4 @@ def getsigmaI(x,center_reduction,sigmaIcorner):
     fsig = x**2*(1-sigmapfac)+sigmapfac
     return fsig*sigmaIcorner
 
-# @njit
-# def f0d_solve_ivp(t, y, myparams):
-#     Nbar, Nstar, sigmaI, sigma0, nu_kin_mlyperus, tau_eq = myparams  # unpack parameters
-#     NQLL0 = y[0]
-#     Ntot0 = y[1]      # unpack current values of y
 
-#     # Ntot deposition
-#     twopi = 2*np.pi
-#     m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
-#     sigma_m = (sigmaI - m * sigma0)
-#     depsurf = nu_kin_mlyperus * sigma_m
-#     dNtot_dt = depsurf
-    
-#     # NQLL
-#     dNQLL_dt = dNtot_dt - getDeltaNQLL(Ntot0,Nstar,Nbar,NQLL0)/tau_eq
-    
-#     # Packaging up for output
-#     derivs = [dNQLL_dt, dNtot_dt]
-#     return derivs
-
-# def run_f0d(NQLL_init_0D,Ntot_init_0D,times,params,odemethod):
-#     # Call the ODE solver
-#     ylast = np.array([NQLL_init_0D,Ntot_init_0D])
-#     ykeep_0D = [ylast]
-#     lastprogress = 0
-
-#     nt = len(times)
-#     for i in range(0,nt-1):
-
-#         # Specify the time interval of this step
-#         tinterval = [times[i],times[i+1]]
-        
-#         # Integrate up to next time step
-#         sol = solve_ivp(f0d_solve_ivp, tinterval, ylast, dense_output=True, args=(params,),rtol=1e-12,method=odemethod)
-#         ylast = sol.y[:,-1]
-
-#         # Stuff into keeper arrays
-#         ykeep_0D.append(ylast)
-        
-#         # Progress reporting
-#         progress = int(i/nt*100)
-#         if np.mod(progress,10) == 0:
-#             if progress > lastprogress:
-#                 print(progress,'% done')
-#                 lastprogress = progress
-
-#     print('100% done')
-#     ykeep_0D = np.array(ykeep_0D, np.float64)
-#     NQLLkeep_0D = ykeep_0D[:,0]
-#     Ntotkeep_0D = ykeep_0D[:,1]
-
-#     return Ntotkeep_0D, NQLLkeep_0D 
