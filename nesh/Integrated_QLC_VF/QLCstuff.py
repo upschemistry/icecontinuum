@@ -80,7 +80,7 @@ def solve_ivp_VF2d(t, y, slice_params, integer_params, float_params):
     return dun_dt
 
 def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
-         AssignQuantity,verbose=0,Integration_method='Euler',tmax=0, dt=0):
+         AssignQuantity,verbose=0,Integration_method='Euler',tmax=0, dt=0, aspect_ratio=1):
     
     # Times
     if tmax == 0:
@@ -145,10 +145,7 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
     # Dirichlet conditions at the far-field boundary
     udirichlet = P_vapor_eq*(sigmaI_far_field+1)
     if verbose > 0: print('udirichlet = ', udirichlet)
-    
-    # Shape of the crystal
-    aspect_ratio = 1
-    
+        
     # Calculating how many time steps we'll do
     ntimes = int(tmax/dt)
     if verbose > 0:
@@ -342,7 +339,7 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
         plt.plot(xvec,yvec,color=color,linewidth=linewidth)
   
     # Return
-    return [xshifted, sigmaDx], [yshifted, sigmaDy]
+    return [xshifted, sigmaDx], [yshifted, sigmaDy], [x, y, un]
 
 def getDofTpow(T,AssignQuantity):
     """ Returns D in micrometers^2/microsecond """
@@ -352,7 +349,7 @@ def getDofTpow(T,AssignQuantity):
     m = 1.86121271
     b = -7.35421981
     T0 = 273.15
-    Do = 21.91612692493907
+    D0 = 21.91612692493907
     D = (T.magnitude/T0)**m * D0
     D = AssignQuantity(D,'micrometers^2/microsecond')
     return D
