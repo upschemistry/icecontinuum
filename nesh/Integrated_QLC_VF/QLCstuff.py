@@ -80,17 +80,15 @@ def solve_ivp_VF2d(t, y, slice_params, integer_params, float_params):
     return dun_dt
 
 def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
-         AssignQuantity,verbose=0,Integration_method='Euler',tmax=0, dt=0, aspect_ratio=1):
+         AssignQuantity,verbose=0,Integration_method='Euler',\
+         tmax_mag=0.5, dt=0, aspect_ratio=1, nx=151, ny=151, xmax_mag=1000):
     
     # Times
-    if tmax == 0:
-        tmax = AssignQuantity(0.5,'microsecond')
+    tmax = AssignQuantity(tmax_mag,'microsecond')
 
     # Box size
-    nx = 151
-    ny = 151
-    xmax = AssignQuantity(1000,'micrometer')
-    ymax = AssignQuantity(1000,'micrometer')
+    xmax = AssignQuantity(xmax_mag,'micrometer')
+    ymax = AssignQuantity(xmax_mag,'micrometer')
     x = np.linspace(0,xmax,nx); dx = x[1]-x[0]
     if verbose>0:
         print('dx', dx)
