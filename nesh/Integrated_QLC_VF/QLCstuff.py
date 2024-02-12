@@ -7,15 +7,196 @@ from matplotlib import rcParams
 
 
 ticklabelsize = 15
-linewidth = 2
+linewidth = 1
 fontsize = 15
 color = 'k'
 markersize = 10
 
-@njit
+def propagate_vaporfield_Euler_x1d(u0,udirichlet,uneumann,Deff):
+    
+    # Diffusion ... indices [1:-1] exclude the first and the last ...
+    un = np.empty(np.shape(u0))
+    un[1:-1] = u0[1:-1] + (u0[2:] - 2*u0[1:-1] + u0[:-2]) *Deff
+
+    # Dirichlet outer boundary
+    un[-1]=udirichlet
+
+    # Inner boundary: diffusion and Neumann
+    un[0] = u0[0]
+    un[0] += (u0[1] - u0[0])*Deff
+    un[0] -= uneumann
+    
+    # Return
+    return un
+
+def VF2d_x1d(Temperature,Pressure,g_ice,sigmaI_far_field,L,\
+         AssignQuantity,verbose=0,\
+         tmax_mag=0.5, dt=0, nx=151, xmax_mag=1000):
+    
+    # Times
+    tmax = AssignQuantity(tmax_mag,'microsecond')
+
+    # Box size
+    xmax = AssignQuantity(cmax_mag,'micrometer')
+    x = np.linspace(L,xmax,nx); dx = x[1]-x[0]
+    dx2 = dx**2
+
+    # Compute diffusion coefficient of water through air at this temperature and pressure
+    # This is using trends from engineering toolbox, with the log-log correction
+    D = getDofTP(Temperature,Pressure,AssignQuantity)
+
+    # Getting a suitable time step
+    if dt == 0:
+        dt = dx2/D/30
+
+    # Computing effective diffusion coefficents (without dt)
+    Deff = D/dr2
+    
+    # Calculating the Neumann condition at the vapor/ice boundary (starting with ice density)
+    rho_ice = AssignQuantity(0.9,'g/cm^3')
+    Mvap = AssignQuantity(18,'g/mol')
+    R = AssignQuantity(8.314,'J/mol/kelvin')
+    uneumann = rho_ice*g_ice*R*Temperature/(Mvap*dr); uneumann.ito('pascal/microsecond')
+    if verbose>0:
+        print('uneumann = ',uneumann)
+    
+    # Converting this into pressures
+    P3 = AssignQuantity(611,'Pa')
+    T3 = AssignQuantity(273,'kelvin')
+    Delta_H_sub = AssignQuantity(50,'kJ/mol')
+    P_vapor_eq = P3*np.exp(-Delta_H_sub/R*(1/Temperature-1/T3))
+    if verbose > 0: print('Vapor pressure at this temperature = ', P_vapor_eq)
+
+    # Dirichlet conditions at the far-field boundary
+    udirichlet = P_vapor_eq*(sigmaI_far_field+1)
+    if verbose > 0: print('udirichlet = ', udirichlet)
+        
+    # Calculating how many time steps we'll do
+    ntimes = int(tmax/dt)
+    if verbose > 0:
+        print('Integrating steps = ', ntimes)
+        print('Integrating out to ', ntimes*dt) # This is a check -- it should be very close to the tmax specified above
+
+    # Initialize u0 and un as ones/zeros matrices 
+    u0 = np.ones([nx])*udirichlet # starting u values        
+    un_mag = u0.magnitude
+    udirichlet_mag = udirichlet.magnitude
+    uneumann_mag = uneumann.magnitude
+
+    # Propagate forward a bunch of times
+    uneumann_Euler_mag = uneumann_mag*dt.magnitude
+    Deff_Euler_mag = Deff.magnitude*dt.magnitude
+    x_mag = x.magnitude
+
+    for i in range(ntimes):
+        un_mag = propagate_vaporfield_Euler_x1d(\
+             un_mag, udirichlet_mag, uneumann_Euler_mag,\
+             Deff2_Euler_mag)
+ 
+    # Re-dimensionalize
+    un = AssignQuantity(un_mag,'pascal')
+    
+    # Return
+    return [r,un]
+
+def propagate_vaporfield_Euler_r1d(u0,udirichlet,uneumann,Deff1,Deff2,r):
+    
+    # Diffusion ... indices [1:-1] exclude the first and the last ...
+    un = np.empty(np.shape(u0))
+    un[1:-1] = u0[1:-1] + (u0[2:] - 2*u0[1:-1] + u0[:-2]) *Deff2
+    un[1:-1] += 2 *(u0[1:-1]-u0[0:-2]) *Deff1/r[1:-1]
+
+    # Dirichlet outer boundary
+    un[-1]=udirichlet
+
+    # Inner boundary: diffusion and Neumann
+    un[0] = u0[0]
+    un[0] +=   (u0[1] - u0[0])*Deff2
+    un[0] += 2*(u0[1] - u0[0])*Deff1/r[0]
+    un[0] -= uneumann
+    
+    return un
+
+def VF2d_r1d(Temperature,Pressure,g_ice,sigmaI_far_field,L,\
+         AssignQuantity,verbose=0,\
+         tmax_mag=0.5, dt=0, nr=151, rmax_mag=1000):
+    
+    # Times
+    tmax = AssignQuantity(tmax_mag,'microsecond')
+
+    # Box size
+    rmax = AssignQuantity(rmax_mag,'micrometer')
+    r = np.linspace(L,rmax,nr); dr = r[1]-r[0]
+    dr2 = dr**2
+
+    # Compute diffusion coefficient of water through air at this temperature and pressure
+    # This is using trends from engineering toolbox, with the log-log correction
+    D = getDofTP(Temperature,Pressure,AssignQuantity)
+
+    # Getting a suitable time step
+    if dt == 0:
+        dt = dr2/D/30
+
+    # Computing effective diffusion coefficents (without dt)
+    Deff1 = D/dr
+    Deff2 = D/dr2
+    
+    # Calculating the Neumann condition at the vapor/ice boundary (starting with ice density)
+    rho_ice = AssignQuantity(0.9,'g/cm^3')
+    Mvap = AssignQuantity(18,'g/mol')
+    R = AssignQuantity(8.314,'J/mol/kelvin')
+    uneumann = rho_ice*g_ice*R*Temperature/(Mvap*dr); uneumann.ito('pascal/microsecond')
+    if verbose>0:
+        print('uneumann = ',uneumann)
+    
+    # Converting this into pressures
+    P3 = AssignQuantity(611,'Pa')
+    T3 = AssignQuantity(273,'kelvin')
+    Delta_H_sub = AssignQuantity(50,'kJ/mol')
+    P_vapor_eq = P3*np.exp(-Delta_H_sub/R*(1/Temperature-1/T3))
+    if verbose > 0: print('Vapor pressure at this temperature = ', P_vapor_eq)
+
+    # Dirichlet conditions at the far-field boundary
+    udirichlet = P_vapor_eq*(sigmaI_far_field+1)
+    if verbose > 0: print('udirichlet = ', udirichlet)
+        
+    # Calculating how many time steps we'll do
+    ntimes = int(tmax/dt)
+    if verbose > 0:
+        print('Integrating steps = ', ntimes)
+        print('Integrating out to ', ntimes*dt) # This is a check -- it should be very close to the tmax specified above
+
+    # Initialize u0 and un as ones/zeros matrices 
+    u0 = np.ones([nr])*udirichlet*.9999 # starting u values        
+    un_mag = u0.magnitude
+    udirichlet_mag = udirichlet.magnitude
+    uneumann_mag = uneumann.magnitude
+
+    # Propagate forward a bunch of times
+    uneumann_Euler_mag = uneumann_mag*dt.magnitude
+    Deff1_Euler_mag = Deff1.magnitude*dt.magnitude
+    Deff2_Euler_mag = Deff2.magnitude*dt.magnitude
+    r_mag = r.magnitude
+#     test = propagate_vaporfield_Euler_r1d(un_mag,udirichlet_mag,uneumann_Euler_mag,Deff1_Euler_mag,Deff2_Euler_mag,r_mag)
+#     print(test)
+#     return
+
+    for i in range(ntimes):
+        un_mag = propagate_vaporfield_Euler_r1d(\
+             un_mag, udirichlet_mag, uneumann_Euler_mag,\
+             Deff1_Euler_mag, Deff2_Euler_mag,\
+             r_mag)
+ 
+    # Re-dimensionalize
+    un = AssignQuantity(un_mag,'pascal')
+    
+    # Return
+    return [r,un]
+
+                           
 def propagate_vaporfield_Euler(u0,ixbox,iybox,udirichlet,uneumannx,uneumanny,Dxeff,Dyeff):
     
-    # Diffusion
+    # Diffusion ... indices [1:-1] exclude the first and the last
     un = np.empty(np.shape(u0))
     un[1:-1, 1:-1] = u0[1:-1, 1:-1] + ( \
     (u0[2:, 1:-1] - 2*u0[1:-1, 1:-1] + u0[:-2, 1:-1])*Dxeff + \
@@ -153,10 +334,13 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
     # Define the box inside
     Ldesiredx = Ldesired # Doesn't always work out to this because the grid is discretized
     boxradx = int(Ldesiredx/dx)
-    Lx = boxradx*dx; 
+    Lx = boxradx*dx
+    if verbose > 0: print('    box Lx = ', Lx)
+
     Ldesiredy = Ldesiredx*aspect_ratio
     boxrady = int(Ldesiredy/dy)
-    Ly = boxrady*dy; 
+    Ly = boxrady*dy
+    if verbose > 0: print('    box Ly = ', Ly)
 
     # Indices defining the crystal
     ixboxmin = nxmid-boxradx
@@ -254,7 +438,7 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
         iextend = 6
         fontsize = 25
         color = 'k'
-        linewidth = 4
+        linewidth = 1
         markersize = 10
 
         ixbox_pre = slice(0,ixboxmin)
@@ -318,7 +502,7 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
         
         # Graph as contour plot
         fig,ax = plt.subplots()
-        CS = ax.contour(x.magnitude,y.magnitude,un.T.magnitude)
+        CS = ax.contour(x.magnitude+dx.magnitude/2,y.magnitude+dy.magnitude/2,un.T.magnitude)
         ax.set_xlabel(r'$x$ ($\mu m$)', fontsize=fontsize)
         ax.set_ylabel(r'$y$ ($\mu m$)', fontsize=fontsize)
         fig.colorbar(CS)
@@ -335,9 +519,10 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
         yvec = (y[iyboxmax].magnitude,y[iyboxmax].magnitude)
         plt.title(Integration_method)
         plt.plot(xvec,yvec,color=color,linewidth=linewidth)
+        ax.axis('equal')
   
     # Return
-    return [xshifted, sigmaDx], [yshifted, sigmaDy], [x, y, un]
+    return [xshifted, sigmaDx], [yshifted, sigmaDy], [x, y, un], [Lx, Ly]
 
 def getDofTpow(T,AssignQuantity):
     """ Returns D in micrometers^2/microsecond """
