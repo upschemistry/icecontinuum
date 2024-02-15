@@ -447,7 +447,7 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
         plt.plot(x[ixbox_pre], un[ixbox_pre,nymid], 'blue')
         plt.plot(x[ixbox_post],un[ixbox_post,nymid],'blue')
         plt.xlabel('x')
-        plt.title(Integration_method)
+#         plt.title(Integration_method)
         plt.grid(True)
 
         iybox_pre = slice(0,iyboxmin)
@@ -456,7 +456,7 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
         plt.plot(y[iybox_pre], un[nxmid,iybox_pre], 'green')
         plt.plot(y[iybox_post],un[nxmid,iybox_post],'green')
         plt.xlabel('y')
-        plt.title(Integration_method)
+#         plt.title(Integration_method)
         plt.grid(True)
 
         # This is pressure right "above" the surface (i.e., the next y-bin)
@@ -472,7 +472,7 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
         plt.xlabel(r'$x$ ($\mu m$)', fontsize=fontsize)
         plt.ylabel(r'$P_{vap}$',fontsize=fontsize)
         plt.legend()
-        plt.title(Integration_method)
+#         plt.title(Integration_method)
         plt.grid(True)
 
         # This is supersaturation right "above" the surface (i.e., the next y-bin)
@@ -481,7 +481,7 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
         plt.xlabel(r'$y$ ($\mu m$)', fontsize=fontsize)
         plt.ylabel(r'$\sigma_I(x)$',fontsize=fontsize)
         plt.legend()
-        plt.title(Integration_method)
+#         plt.title(Integration_method)
         plt.grid(True)
 
         # This is pressure right "to the right" of the surface (i.e., the next x-bin)
@@ -497,7 +497,7 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
         plt.xlabel(r'$y$ ($\mu m$)', fontsize=fontsize)
         plt.ylabel(r'$P_{vap}$',fontsize=fontsize)
         plt.legend()
-        plt.title(Integration_method)
+#         plt.title(Integration_method)
         plt.grid(True)
         
         # Graph as contour plot
@@ -517,7 +517,7 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
         plt.plot(xvec,yvec,color=color,linewidth=linewidth)
         xvec = (x[ixboxmin].magnitude,x[ixboxmax].magnitude)
         yvec = (y[iyboxmax].magnitude,y[iyboxmax].magnitude)
-        plt.title(Integration_method)
+#         plt.title(Integration_method)
         plt.plot(xvec,yvec,color=color,linewidth=linewidth)
         ax.axis('equal')
   
@@ -728,7 +728,7 @@ def run_f0d(NQLL_init_0D, Ntot_init_0D, times,\
     ylast = np.array([NQLL_init_0D,Ntot_init_0D])
     ykeep_0D = [ylast]
     lastprogress = 0
-
+    
     nt = len(times)
     for i in range(0,nt-1):
 
