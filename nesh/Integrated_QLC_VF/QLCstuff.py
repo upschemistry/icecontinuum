@@ -318,11 +318,11 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
     P3 = AssignQuantity(611,'Pa')
     T3 = AssignQuantity(273,'kelvin')
     Delta_H_sub = AssignQuantity(50,'kJ/mol')
-    P_vapor_eq = P3*np.exp(-Delta_H_sub/R*(1/Temperature-1/T3))
-    if verbose > 0: print('Vapor pressure at this temperature = ', P_vapor_eq)
+    P_vap_eq = P3*np.exp(-Delta_H_sub/R*(1/Temperature-1/T3))
+    if verbose > 0: print('Vapor pressure at this temperature = ', P_vap_eq)
 
     # Dirichlet conditions at the far-field boundary
-    udirichlet = P_vapor_eq*(sigmaI_far_field+1)
+    udirichlet = P_vap_eq*(sigmaI_far_field+1)
     if verbose > 0: print('udirichlet = ', udirichlet)
         
     # Calculating how many time steps we'll do
@@ -383,35 +383,36 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
 
     else:                
         if verbose > 0: print("Solving using "+Integration_method)
-        # Dirichlet outer boundary
-        un_mag[[0,-1],:]=udirichlet.magnitude
-        un_mag[:,[0,-1]]=udirichlet.magnitude
+        print('Not implemented')
+#         # Dirichlet outer boundary
+#         un_mag[[0,-1],:]=udirichlet.magnitude
+#         un_mag[:,[0,-1]]=udirichlet.magnitude
         
-        # This is the starting state
-        ylast = np.reshape(un_mag,(nx*ny,1))
-        if verbose > 0: print('shape of ylast =', np.shape(ylast))
-        ylast = np.squeeze(ylast)
-        if verbose > 0: print('shape of ylast =', np.shape(ylast))
+#         # This is the starting state
+#         ylast = np.reshape(un_mag,(nx*ny,1))
+#         if verbose > 0: print('shape of ylast =', np.shape(ylast))
+#         ylast = np.squeeze(ylast)
+#         if verbose > 0: print('shape of ylast =', np.shape(ylast))
         
-        # Indices for the crystal inside
-        ixmin = ixbox.start
-        ixmax = ixbox.stop-1
-        iymin = iybox.start
-        iymax = iybox.stop-1
+#         # Indices for the crystal inside
+#         ixmin = ixbox.start
+#         ixmax = ixbox.stop-1
+#         iymin = iybox.start
+#         iymax = iybox.stop-1
         
-        # Packaging up parameters
-        slice_params = np.array([ixmin,ixmax,iymin,iymax])
-        integer_params = np.array([nx, ny])
-        float_params = \
-             np.array([udirichlet.magnitude, uneumannx.magnitude, uneumanny.magnitude, Dxeff.magnitude, Dyeff.magnitude])
+#         # Packaging up parameters
+#         slice_params = np.array([ixmin,ixmax,iymin,iymax])
+#         integer_params = np.array([nx, ny])
+#         float_params = \
+#              np.array([udirichlet.magnitude, uneumannx.magnitude, uneumanny.magnitude, Dxeff.magnitude, Dyeff.magnitude])
         
-        # Integrating
-        tinterval = [0.0,tmax.magnitude]
-        sol = solve_ivp(\
-              solve_ivp_VF2d, tinterval, ylast, args=(slice_params, integer_params, float_params),\
-              rtol=1e-8,method=Integration_method)
-        ylast = sol.y[:,-1]
-        un_mag = np.reshape(ylast,(nx,ny))
+#         # Integrating
+#         tinterval = [0.0,tmax.magnitude]
+#         sol = solve_ivp(\
+#               solve_ivp_VF2d, tinterval, ylast, args=(slice_params, integer_params, float_params),\
+#               rtol=1e-8,method=Integration_method)
+#         ylast = sol.y[:,-1]
+#         un_mag = np.reshape(ylast,(nx,ny))
         
     # Re-dimensionalize
     un = AssignQuantity(un_mag,'pascal')
@@ -419,13 +420,13 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
     # Now a slice just across one of the box surfaces (in the x dimension)
     uslicex = un[ixbox,nymid+boxrady]
     c_rx_percent = (max(uslicex)-min(uslicex))/uslicex[0]*100
-    sigmaDx = uslicex/P_vapor_eq-1
+    sigmaDx = uslicex/P_vap_eq-1
     xshifted = x[ixbox]-x[nxmid]+dx/2
 
     # Now a slice just across one of the box surfaces (in the y dimension)
     uslicey = un[nxmid+boxradx, iybox]
     c_ry_percent = (max(uslicey)-min(uslicey))/uslicey[0]*100
-    sigmaDy = uslicey/P_vapor_eq-1
+    sigmaDy = uslicey/P_vap_eq-1
     yshifted = y[iybox]-y[nymid]+dy/2
     
     # Filling in where the crystal is
@@ -447,7 +448,6 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
         plt.plot(x[ixbox_pre], un[ixbox_pre,nymid], 'blue')
         plt.plot(x[ixbox_post],un[ixbox_post,nymid],'blue')
         plt.xlabel('x')
-#         plt.title(Integration_method)
         plt.grid(True)
 
         iybox_pre = slice(0,iyboxmin)
@@ -456,15 +456,11 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
         plt.plot(y[iybox_pre], un[nxmid,iybox_pre], 'green')
         plt.plot(y[iybox_post],un[nxmid,iybox_post],'green')
         plt.xlabel('y')
-#         plt.title(Integration_method)
         plt.grid(True)
 
         # This is pressure right "above" the surface (i.e., the next y-bin)
         plt.figure()
         plt.plot(xshifted,uslicex,'ob',label='Just above the crystal',lw=linewidth,ms=markersize)
-        p = np.polyfit(xshifted.magnitude,uslicex.magnitude,2); #print(p)
-        xshifted_theory = np.linspace(min(xshifted),max(xshifted))
-        plt.plot(xshifted_theory,np.polyval(p,xshifted_theory.magnitude),'-r',label='Parabolic fit',lw=linewidth)
         bigixbox = [ix for ix in range(nxmid-boxradx-iextend,nxmid+boxradx+iextend)]
         biguslice = un[bigixbox,nymid+boxrady]
         bigxshifted = x[bigixbox]-x[nxmid]+dx/2
@@ -472,24 +468,22 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
         plt.xlabel(r'$x$ ($\mu m$)', fontsize=fontsize)
         plt.ylabel(r'$P_{vap}$',fontsize=fontsize)
         plt.legend()
-#         plt.title(Integration_method)
         plt.grid(True)
 
         # This is supersaturation right "above" the surface (i.e., the next y-bin)
         plt.figure()        
         plt.plot(xshifted,sigmaDx,'ob', label='Above crystal',ms=markersize)
+        p = np.polyfit(xshifted.magnitude,sigmaDx.magnitude,2); #print(p)
+        xshifted_theory = np.linspace(min(xshifted),max(xshifted))
+        plt.plot(xshifted_theory,np.polyval(p,xshifted_theory.magnitude),'-r',label='Parabolic fit',lw=linewidth)
         plt.xlabel(r'$y$ ($\mu m$)', fontsize=fontsize)
         plt.ylabel(r'$\sigma_I(x)$',fontsize=fontsize)
         plt.legend()
-#         plt.title(Integration_method)
         plt.grid(True)
 
         # This is pressure right "to the right" of the surface (i.e., the next x-bin)
         plt.figure()
         plt.plot(yshifted,uslicey,'ob',label='Just to the right of the crystal',lw=linewidth,ms=markersize)
-        p = np.polyfit(yshifted.magnitude,uslicey.magnitude,2); #print(p)
-        yshifted_theory = np.linspace(min(yshifted),max(yshifted))
-        plt.plot(yshifted_theory,np.polyval(p,yshifted_theory.magnitude),'-r',label='Parabolic fit',lw=linewidth)
         bigiybox = [iy for iy in range(nymid-boxrady-iextend,nymid+boxrady+iextend)]
         biguslice = un[nxmid+boxradx,bigiybox]
         bigyshifted = y[bigiybox]-y[nymid]+dy/2
@@ -497,7 +491,6 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
         plt.xlabel(r'$y$ ($\mu m$)', fontsize=fontsize)
         plt.ylabel(r'$P_{vap}$',fontsize=fontsize)
         plt.legend()
-#         plt.title(Integration_method)
         plt.grid(True)
         
         # Graph as contour plot
@@ -517,7 +510,6 @@ def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
         plt.plot(xvec,yvec,color=color,linewidth=linewidth)
         xvec = (x[ixboxmin].magnitude,x[ixboxmax].magnitude)
         yvec = (y[iyboxmax].magnitude,y[iyboxmax].magnitude)
-#         plt.title(Integration_method)
         plt.plot(xvec,yvec,color=color,linewidth=linewidth)
         ax.axis('equal')
   
@@ -790,45 +782,53 @@ def report_0d_growth_results(tkeep_0Darr,NQLLkeep_0D,Ntotkeep_0D,Nicekeep_0D,Nba
     return g_ice_QLC
 
 
-def report_1d_growth_results(x_QLC,tkeep_1Darr,NQLLkeep_1D,Ntotkeep_1D,Nicekeep_1D,nmpermonolayer,lastfraction=0):
+def report_1d_growth_results(\
+         x_QLC,tkeep_1Darr,NQLLkeep_1D,Ntotkeep_1D,Nicekeep_1D,nmpermonolayer,lastfraction=0, title_params='',graphics=True):
     
     # Parameters of the data
     ntimes = len(NQLLkeep_1D)
     itime = -1 # This is the one we want to focus on
-    
-    # Plot ice and total profile
-    plt.figure()
-    plt.plot(x_QLC.magnitude, Nicekeep_1D[itime,:], 'k', label='ice', lw=linewidth)
-    plt.plot(x_QLC.magnitude, Ntotkeep_1D[itime,:], 'b', label='total', lw=linewidth)
-    plt.xlabel(r'$x (\mu m$)',fontsize=fontsize)
-    plt.ylabel(r'$ice \ & \ liquid \ layers$',fontsize=fontsize)
-    rcParams['xtick.labelsize'] = ticklabelsize 
-    rcParams['ytick.labelsize'] = ticklabelsize
-    plt.legend()
-    this_time = tkeep_1Darr[itime].to('millisecond')
-    title_time = "{:.0f}".format(this_time.magnitude)
-    plt.title(title_time+' '+str(this_time.units))
-    plt.grid('on')
 
-    # Plot liquid
-    plt.figure()
-    plt.plot(x_QLC.magnitude, NQLLkeep_1D[itime,:], 'b', label='liquid', lw=linewidth)
-    plt.xlabel(r'$x (\mu m$)',fontsize=fontsize)
-    plt.ylabel(r'$liquid \ layers$',fontsize=fontsize)
-    rcParams['xtick.labelsize'] = ticklabelsize 
-    rcParams['ytick.labelsize'] = ticklabelsize
-    plt.title(title_time+' '+str(this_time.units))
-    plt.grid('on')
+    if graphics:
+        
+        # Titles on graphs
+#         this_time = tkeep_1Darr[itime].to('millisecond')
+#         title_time = "{:.0f}".format(this_time.magnitude)
+#         title_entire = title_time+' '+str(this_time.units) + title_params
+        title_entire = title_params
 
-    # Plot number of steps over time
-    plt.figure()
-    rcParams['xtick.labelsize'] = ticklabelsize 
-    rcParams['ytick.labelsize'] = ticklabelsize
-    f = np.max(Ntotkeep_1D,axis=1) - np.min(Ntotkeep_1D,axis=1)
-    plt.plot(tkeep_1Darr.magnitude/1e3,f,lw=linewidth)
-    plt.xlabel(r't ($m s$)',fontsize=fontsize)
-    plt.ylabel('Number of steps',fontsize=fontsize)
-    plt.grid('on')
+        # Plot ice and total profile
+        plt.figure()
+        plt.plot(x_QLC.magnitude, Nicekeep_1D[itime,:], 'k', label='ice', lw=linewidth)
+        plt.plot(x_QLC.magnitude, Ntotkeep_1D[itime,:], 'b', label='total', lw=linewidth)
+        plt.xlabel(r'$x (\mu m$)',fontsize=fontsize)
+        plt.ylabel(r'$ice \ & \ liquid \ layers$',fontsize=fontsize)
+        rcParams['xtick.labelsize'] = ticklabelsize 
+        rcParams['ytick.labelsize'] = ticklabelsize
+        plt.legend()
+        plt.title(title_entire)
+        plt.grid('on')
+
+        # Plot liquid
+        plt.figure()
+        plt.plot(x_QLC.magnitude, NQLLkeep_1D[itime,:], 'b', label='liquid', lw=linewidth)
+        plt.xlabel(r'$x (\mu m$)',fontsize=fontsize)
+        plt.ylabel(r'$liquid \ layers$',fontsize=fontsize)
+        rcParams['xtick.labelsize'] = ticklabelsize 
+        rcParams['ytick.labelsize'] = ticklabelsize
+        plt.title(title_entire)
+        plt.grid('on')
+
+        # Plot number of steps over time
+        plt.figure()
+        rcParams['xtick.labelsize'] = ticklabelsize 
+        rcParams['ytick.labelsize'] = ticklabelsize
+        f = np.max(Ntotkeep_1D,axis=1) - np.min(Ntotkeep_1D,axis=1)
+        plt.plot(tkeep_1Darr.magnitude/1e3,f,lw=linewidth)
+        plt.xlabel(r't ($m s$)',fontsize=fontsize)
+        plt.ylabel('Number of steps',fontsize=fontsize)
+        plt.title(title_entire)
+        plt.grid('on')
 
     # Some analysis
     if lastfraction == 0:
