@@ -260,9 +260,13 @@ def solve_ivp_VF2d(t, y, slice_params, integer_params, float_params):
     dun_dt = np.reshape(dun_dt,(nx*ny,))
     return dun_dt
 
-def VF2d(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
+def VF2DSquare(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
          AssignQuantity,verbose=0,Integration_method='Euler',\
          tmax_mag=0.5, dt=0, aspect_ratio=1, nx=151, ny=151, xmax_mag=1000):
+    """
+    Numerical solution of the vapor field surrounding a square crystal (with Neumann conditions)
+    inside a far-field Dirichlet box
+    """
     
     # Times
     tmax = AssignQuantity(tmax_mag,'microsecond')
