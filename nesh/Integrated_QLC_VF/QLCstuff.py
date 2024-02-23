@@ -796,17 +796,14 @@ def report_1d_growth_results(\
     if graphics:
         
         # Titles on graphs
-#         this_time = tkeep_1Darr[itime].to('millisecond')
-#         title_time = "{:.0f}".format(this_time.magnitude)
-#         title_entire = title_time+' '+str(this_time.units) + title_params
         title_entire = title_params
 
         # Plot ice and total profile
         plt.figure()
         plt.plot(x_QLC.magnitude, Nicekeep_1D[itime,:], 'k', label='ice', lw=linewidth)
         plt.plot(x_QLC.magnitude, Ntotkeep_1D[itime,:], 'b', label='total', lw=linewidth)
-        plt.xlabel(r'$x (\mu m$)',fontsize=fontsize)
-        plt.ylabel(r'$ice \ & \ liquid \ layers$',fontsize=fontsize)
+        plt.xlabel('$x \ (\mu m$)',fontsize=fontsize)
+        plt.ylabel('$ice \ & \ liquid \ layers$',fontsize=fontsize)
         rcParams['xtick.labelsize'] = ticklabelsize 
         rcParams['ytick.labelsize'] = ticklabelsize
         plt.legend()
@@ -816,8 +813,8 @@ def report_1d_growth_results(\
         # Plot liquid
         plt.figure()
         plt.plot(x_QLC.magnitude, NQLLkeep_1D[itime,:], 'b', label='liquid', lw=linewidth)
-        plt.xlabel(r'$x (\mu m$)',fontsize=fontsize)
-        plt.ylabel(r'$liquid \ layers$',fontsize=fontsize)
+        plt.xlabel('$x \ (\mu m$)',fontsize=fontsize)
+        plt.ylabel('$liquid \ layers$',fontsize=fontsize)
         rcParams['xtick.labelsize'] = ticklabelsize 
         rcParams['ytick.labelsize'] = ticklabelsize
         plt.title(title_entire)
@@ -829,7 +826,7 @@ def report_1d_growth_results(\
         rcParams['ytick.labelsize'] = ticklabelsize
         f = np.max(Ntotkeep_1D,axis=1) - np.min(Ntotkeep_1D,axis=1)
         plt.plot(tkeep_1Darr.magnitude/1e3,f,lw=linewidth)
-        plt.xlabel(r't ($m s$)',fontsize=fontsize)
+        plt.xlabel('t ($m s$)',fontsize=fontsize)
         plt.ylabel('Number of steps',fontsize=fontsize)
         plt.title(title_entire)
         plt.grid('on')
