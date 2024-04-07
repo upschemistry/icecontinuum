@@ -624,8 +624,10 @@ def f1d_solve_ivp(t, y, scalar_params, sigmaI):
     dy = np.empty(np.shape(NQLL0))
     for i in range(1,len(NQLL0)-1):
         dy[i] = DoverdeltaX2*(NQLL0[i-1]-2*NQLL0[i]+NQLL0[i+1])
-    dy[0]  = DoverdeltaX2*(NQLL0[-1] -2*NQLL0[0] +NQLL0[1]) 
+    dy[0]  = DoverdeltaX2*(NQLL0[-1] -2*NQLL0[0] +NQLL0[1]) # Periodic BC
     dy[-1] = DoverdeltaX2*(NQLL0[-2] -2*NQLL0[-1]+NQLL0[0])
+#     dy[0]  = DoverdeltaX2*(NQLL0[0]  -2*NQLL0[0] +NQLL0[1]) # No-flux BC
+#     dy[-1] = DoverdeltaX2*(NQLL0[-2] -2*NQLL0[-1]+NQLL0[-1])
 
     # Combined
     dNtot_dt += dy
@@ -764,11 +766,13 @@ def get_D_of_T(T,AssignQuantity):
     D = D_o * np.exp(arg_of_exp)
     return D
 
-def report_0d_growth_results(tkeep_0Darr,NQLLkeep_0D,Ntotkeep_0D,Nicekeep_0D,Nbar,Nstar,nmpermonolayer,graphics=True):
+def report_0d_growth_results(\
+         tkeep_0Darr,NQLLkeep_0D,Ntotkeep_0D,Nicekeep_0D,Nbar,Nstar,nmpermonolayer, \
+         graphics=True,itime=-1):
     
     # Growth statistics
-    delta_N = Ntotkeep_0D[-1]-Ntotkeep_0D[0]
-    delta_t = tkeep_0Darr[-1]-tkeep_0Darr[0]
+    delta_N = Ntotkeep_0D[itime]-Ntotkeep_0D[0]
+    delta_t = tkeep_0Darr[itime]-tkeep_0Darr[0]
     g_ice_QLC = delta_N/delta_t*nmpermonolayer; g_ice_QLC.ito('micrometer/second')
     
     # Plot results
@@ -787,11 +791,11 @@ def report_0d_growth_results(tkeep_0Darr,NQLLkeep_0D,Ntotkeep_0D,Nicekeep_0D,Nba
 
 
 def report_1d_growth_results(\
-         x_QLC,tkeep_1Darr,NQLLkeep_1D,Ntotkeep_1D,Nicekeep_1D,nmpermonolayer,lastfraction=0, title_params='',graphics=True):
+         x_QLC,tkeep_1Darr,NQLLkeep_1D,Ntotkeep_1D,Nicekeep_1D,nmpermonolayer,lastfraction=0, title_params='', \
+         graphics=True,itime=-1,tgraphics=True,xlim=[]):
     
     # Parameters of the data
     ntimes = len(NQLLkeep_1D)
-    itime = -1 # This is the one we want to focus on
 
     if graphics:
         
@@ -807,8 +811,12 @@ def report_1d_growth_results(\
         rcParams['xtick.labelsize'] = ticklabelsize 
         rcParams['ytick.labelsize'] = ticklabelsize
         plt.legend()
-        plt.title(title_entire)
+        plt.title(title_entire,fontsize=fontsize/2)
         plt.grid('on')
+        if len(xlim) > 0:
+            plt.xlim(xlim)
+            i = np.where( (x_QLC.magnitude > xlim[0]) &  (x_QLC.magnitude < xlim[1]) )[0]
+            plt.ylim( Nicekeep_1D[itime,:][i].min(), Ntotkeep_1D[itime,:][i].max() ) 
 
         # Plot liquid
         plt.figure()
@@ -817,9 +825,14 @@ def report_1d_growth_results(\
         plt.ylabel('$liquid \ layers$',fontsize=fontsize)
         rcParams['xtick.labelsize'] = ticklabelsize 
         rcParams['ytick.labelsize'] = ticklabelsize
-        plt.title(title_entire)
+        plt.title(title_entire,fontsize=fontsize/2)
         plt.grid('on')
+        if len(xlim) > 0:
+            plt.xlim(xlim)
+            i = np.where( (x_QLC.magnitude > xlim[0]) &  (x_QLC.magnitude < xlim[1]) )[0]
+            plt.ylim( NQLLkeep_1D[itime,:][i].min(), NQLLkeep_1D[itime,:][i].max() ) 
 
+    if tgraphics:
         # Plot number of steps over time
         plt.figure()
         rcParams['xtick.labelsize'] = ticklabelsize 
@@ -828,7 +841,7 @@ def report_1d_growth_results(\
         plt.plot(tkeep_1Darr.magnitude/1e3,f,lw=linewidth)
         plt.xlabel('t ($m s$)',fontsize=fontsize)
         plt.ylabel('Number of steps',fontsize=fontsize)
-        plt.title(title_entire)
+        plt.title(title_entire,fontsize=fontsize/2)
         plt.grid('on')
 
     # Some analysis
