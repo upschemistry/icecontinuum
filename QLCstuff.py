@@ -4,6 +4,7 @@ import matplotlib.pylab as plt
 from scipy.integrate import solve_ivp
 from numba import njit, float64, int32, types
 from matplotlib import rcParams
+from time import time
 
 
 ticklabelsize = 15
@@ -626,7 +627,7 @@ def f1d_solve_ivp(t, y, scalar_params, sigmaI):
         dy[i] = DoverdeltaX2*(NQLL0[i-1]-2*NQLL0[i]+NQLL0[i+1])
     dy[0]  = DoverdeltaX2*(NQLL0[-1] -2*NQLL0[0] +NQLL0[1]) # Periodic BC
     dy[-1] = DoverdeltaX2*(NQLL0[-2] -2*NQLL0[-1]+NQLL0[0])
-#     dy[0]  = DoverdeltaX2*(NQLL0[0]  -2*NQLL0[0] +NQLL0[1]) # No-flux BC
+#     dy[0]  = DoverdeltaX2*(NQLL0[0]  -2*NQLL0[0] +NQLL0[1]) # No-flux BC (should be the same as Periodic BC)
 #     dy[-1] = DoverdeltaX2*(NQLL0[-2] -2*NQLL0[-1]+NQLL0[-1])
 
     # Combined
@@ -646,7 +647,7 @@ def run_f1d(\
            NQLL_init_1D,Ntot_init_1D,times,\
            Nbar, Nstar, sigma0, nu_kin_mlyperus, Doverdeltax2, tau_eq, sigmaI,\
            AssignQuantity,\
-           verbose=0, odemethod='LSODA'):
+           verbose=0, odemethod='LSODA', max_step=None):
 
     """ Solves the QLC-2 problem. Branched from the code in diffusionstuff11.py, it has units """
 
@@ -661,9 +662,10 @@ def run_f1d(\
     ykeep_1D = [ylast]
     lastprogress = 0
     sigmaI_mag = sigmaI.magnitude
-    
-    for i in range(0,nt-1):
+    t1 = time()
 
+    for i in range(0,nt-1):
+                
         # Specify the time interval of this step
         tinterval = [times[i].magnitude,times[i+1].magnitude]
         
@@ -676,7 +678,8 @@ def run_f1d(\
         
         # Integrate up to next time step
         sol = solve_ivp(\
-            f1d_solve_ivp, tinterval, ylast, args=(scalar_params,sigmaI_mag),rtol=1e-12,method=odemethod)
+            f1d_solve_ivp, tinterval, ylast, args=(scalar_params,sigmaI_mag), \
+            rtol=1e-12, method=odemethod, max_step=max_step) 
         ylast = sol.y[:,-1]
         
         # Stuff into keeper arrays
@@ -686,10 +689,16 @@ def run_f1d(\
         progress = int(i/nt*100)
         if np.mod(progress,10) == 0:
             if progress > lastprogress:
-                print(progress,'% done')
+                t2 = time()
+                elapsed = (t2 - t1)/60
+                print(progress,'%'+' elapsed time is %.3f minutes' %elapsed)
                 lastprogress = progress
 
     print('100% done')
+    print('status = ', sol.status)
+    print('message = ', sol.message)
+    print(dir(sol))
+    
     ykeep_1D = np.array(ykeep_1D, np.float64)
     ykeep_1Darr = np.array(ykeep_1D, np.float64)
     ykeep_1Darr_reshaped = np.reshape(ykeep_1Darr,(nt,2,nx))
@@ -811,7 +820,7 @@ def report_1d_growth_results(\
         rcParams['xtick.labelsize'] = ticklabelsize 
         rcParams['ytick.labelsize'] = ticklabelsize
         plt.legend()
-        plt.title(title_entire,fontsize=fontsize/2)
+        plt.title(title_entire,fontsize=fontsize)
         plt.grid('on')
         if len(xlim) > 0:
             plt.xlim(xlim)
@@ -825,7 +834,7 @@ def report_1d_growth_results(\
         plt.ylabel('$liquid \ layers$',fontsize=fontsize)
         rcParams['xtick.labelsize'] = ticklabelsize 
         rcParams['ytick.labelsize'] = ticklabelsize
-        plt.title(title_entire,fontsize=fontsize/2)
+        plt.title(title_entire,fontsize=fontsize)
         plt.grid('on')
         if len(xlim) > 0:
             plt.xlim(xlim)
@@ -841,7 +850,7 @@ def report_1d_growth_results(\
         plt.plot(tkeep_1Darr.magnitude/1e3,f,lw=linewidth)
         plt.xlabel('t ($m s$)',fontsize=fontsize)
         plt.ylabel('Number of steps',fontsize=fontsize)
-        plt.title(title_entire,fontsize=fontsize/2)
+        plt.title(title_entire,fontsize=fontsize)
         plt.grid('on')
 
     # Some analysis
