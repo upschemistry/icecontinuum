@@ -6,6 +6,9 @@ from numba import njit, float64, int32, types
 from matplotlib import rcParams
 from time import time
 
+# See about the Fourier components of some of these solutions
+from scipy.fft import fft, ifft, rfft, irfft, fftfreq
+
 
 ticklabelsize = 15
 linewidth = 1
@@ -627,8 +630,28 @@ def f1d_solve_ivp(t, y, scalar_params, sigmaI):
         dy[i] = DoverdeltaX2*(NQLL0[i-1]-2*NQLL0[i]+NQLL0[i+1])
     dy[0]  = DoverdeltaX2*(NQLL0[-1] -2*NQLL0[0] +NQLL0[1]) # Periodic BC
     dy[-1] = DoverdeltaX2*(NQLL0[-2] -2*NQLL0[-1]+NQLL0[0])
-#     dy[0]  = DoverdeltaX2*(NQLL0[0]  -2*NQLL0[0] +NQLL0[1]) # No-flux BC (should be the same as Periodic BC)
-#     dy[-1] = DoverdeltaX2*(NQLL0[-2] -2*NQLL0[-1]+NQLL0[-1])
+
+    # Diffusion term based on a zeroed-out FT
+#     Dcoefficient1 = 4*DoverdeltaX2/l**2*np.pi**2; #print('Dcoefficient1', Dcoefficient1)
+#     bj_list = rfft(NQLL0)
+#     jmax = 130
+#     j_list = np.array([j for j in range(len(bj_list))])
+#     j2_list = np.array(j_list)**2
+#     j2_list[(j_list>jmax)] = 0
+#     cj_zeroed_list = bj_list*j2_list
+#     dy = -Dcoefficient1  * irfft(cj_zeroed_list)
+
+    # Diffusion term based on a truncated FT (but this runs into trouble because of its shorter length)
+#     Dcoefficient1 = 4*DoverdeltaX2/l**2*np.pi**2; #print('Dcoefficient1', Dcoefficient1)
+#     bj_list = rfft(NQLL0)
+#     jmax = 130
+#     bj_list_head = bj_list[0:jmax]; #print('head', aj_list_head)
+#     bj_list_tail = bj_list[-jmax:-1]; #print('tail', aj_list_tail)
+#     bj_tr_list = np.append(bj_list_head,bj_list_tail)
+#     rescale2 = len(bj_tr_list)/len(bj_list)
+#     cj_tr_list = bj_tr_list*[j**2 for j in range(len(bj_tr_list))]
+#     dy = -Dcoefficient1 * irfft(cj_tr_list)* rescale2
+    
 
     # Combined
     dNtot_dt += dy
@@ -643,11 +666,16 @@ def f1d_solve_ivp(t, y, scalar_params, sigmaI):
 
     return derivs
 
+# def run_f1d(\
+#            NQLL_init_1D,Ntot_init_1D,times,\
+#            Nbar, Nstar, sigma0, nu_kin_mlyperus, Doverdeltax2, tau_eq, sigmaI,\
+#            AssignQuantity,\
+#            verbose=0, odemethod='LSODA', max_step=max_step):
 def run_f1d(\
            NQLL_init_1D,Ntot_init_1D,times,\
            Nbar, Nstar, sigma0, nu_kin_mlyperus, Doverdeltax2, tau_eq, sigmaI,\
            AssignQuantity,\
-           verbose=0, odemethod='LSODA', max_step=None):
+           verbose=0, odemethod='LSODA'):
 
     """ Solves the QLC-2 problem. Branched from the code in diffusionstuff11.py, it has units """
 
@@ -677,9 +705,12 @@ def run_f1d(\
             print(odemethod)
         
         # Integrate up to next time step
+#         sol = solve_ivp(\
+#             f1d_solve_ivp, tinterval, ylast, args=(scalar_params,sigmaI_mag), \
+#             rtol=1e-12, method=odemethod, max_step=max_step) 
         sol = solve_ivp(\
             f1d_solve_ivp, tinterval, ylast, args=(scalar_params,sigmaI_mag), \
-            rtol=1e-12, method=odemethod, max_step=max_step) 
+            rtol=1e-12, method=odemethod) 
         ylast = sol.y[:,-1]
         
         # Stuff into keeper arrays
