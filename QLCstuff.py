@@ -13,6 +13,7 @@ from scipy.fft import fft, ifft, rfft, irfft, fftfreq
 ticklabelsize = 15
 linewidth = 1
 fontsize = 15
+titlefontsize = 8
 color = 'k'
 markersize = 10
 
@@ -611,7 +612,7 @@ def getsigmaI(x,xmax,center_reduction,sigmaIcorner,method='sinusoid'):
         print('bad method')
     return fsig*sigmaIcorner
     
-@njit("f8[:](f8,f8[:],f8[:],f8[:])")
+# @njit("f8[:](f8,f8[:],f8[:],f8[:])")
 def f1d_solve_ivp(t, y, scalar_params, sigmaI):
     Nbar, Nstar, sigma0, nu_kin_mlyperus, DoverdeltaX2, tau_eq = scalar_params
     l = int(len(y)/2)
@@ -625,19 +626,26 @@ def f1d_solve_ivp(t, y, scalar_params, sigmaI):
     dNtot_dt = nu_kin_mlyperus * sigma_m
 
     # Ntot diffusion
-    dy = np.empty(np.shape(NQLL0))
-    for i in range(1,len(NQLL0)-1):
-        dy[i] = DoverdeltaX2*(NQLL0[i-1]-2*NQLL0[i]+NQLL0[i+1])
-    dy[0]  = DoverdeltaX2*(NQLL0[-1] -2*NQLL0[0] +NQLL0[1]) # Periodic BC
-    dy[-1] = DoverdeltaX2*(NQLL0[-2] -2*NQLL0[-1]+NQLL0[0])
+#     dy = np.empty(np.shape(NQLL0))
+#     for i in range(1,len(NQLL0)-1):
+#         dy[i] = DoverdeltaX2*(NQLL0[i-1]-2*NQLL0[i]+NQLL0[i+1])
+#     dy[0]  = DoverdeltaX2*(NQLL0[-1] -2*NQLL0[0] +NQLL0[1]) # Periodic BC
+#     dy[-1] = DoverdeltaX2*(NQLL0[-2] -2*NQLL0[-1]+NQLL0[0])
+
+    # Diffusion term based on FT -- This is very unstable (only works if we reduce Dcoefficient1 by half, or more)
+    Dcoefficient1 = 4*DoverdeltaX2/l**2*np.pi**2; #print('Dcoefficient1', Dcoefficient1)
+    bj_list = rfft(NQLL0)
+    j_list = np.array([j for j in range(len(bj_list))])
+    j2_list = np.array(j_list)**2
+    cj_list = bj_list*j2_list
+    dy = -Dcoefficient1  * irfft(cj_list)
 
     # Diffusion term based on a zeroed-out FT
 #     Dcoefficient1 = 4*DoverdeltaX2/l**2*np.pi**2; #print('Dcoefficient1', Dcoefficient1)
 #     bj_list = rfft(NQLL0)
-#     jmax = 130
 #     j_list = np.array([j for j in range(len(bj_list))])
 #     j2_list = np.array(j_list)**2
-#     j2_list[(j_list>jmax)] = 0
+#     j2_list[(j_list>100)] = 0
 #     cj_zeroed_list = bj_list*j2_list
 #     dy = -Dcoefficient1  * irfft(cj_zeroed_list)
 
@@ -851,7 +859,7 @@ def report_1d_growth_results(\
         rcParams['xtick.labelsize'] = ticklabelsize 
         rcParams['ytick.labelsize'] = ticklabelsize
         plt.legend()
-        plt.title(title_entire,fontsize=fontsize)
+        plt.title(title_entire,fontsize=titlefontsize)
         plt.grid('on')
         if len(xlim) > 0:
             plt.xlim(xlim)
@@ -865,7 +873,7 @@ def report_1d_growth_results(\
         plt.ylabel('$liquid \ layers$',fontsize=fontsize)
         rcParams['xtick.labelsize'] = ticklabelsize 
         rcParams['ytick.labelsize'] = ticklabelsize
-        plt.title(title_entire,fontsize=fontsize)
+        plt.title(title_entire,fontsize=titlefontsize)
         plt.grid('on')
         if len(xlim) > 0:
             plt.xlim(xlim)
@@ -881,7 +889,7 @@ def report_1d_growth_results(\
         plt.plot(tkeep_1Darr.magnitude/1e3,f,lw=linewidth)
         plt.xlabel('t ($m s$)',fontsize=fontsize)
         plt.ylabel('Number of steps',fontsize=fontsize)
-        plt.title(title_entire,fontsize=fontsize)
+        plt.title(title_entire,fontsize=titlefontsize)
         plt.grid('on')
 
     # Some analysis
