@@ -87,10 +87,6 @@ def pypr_solve_ivp(t, y, scalar_params, sigmaI, j2_list, x_QLC):
     alpha_pr = 1 - alpha_pyneg - alpha_pypos
  
     # Ntot deposition
-#     Nstar_combined = alpha_pr*Nstar_pr + alpha_pyneg*Nstar_py + alpha_pypos*Nstar_py
-#     m = (NQLL_pr -(Nbar-Nstar_combined))/(2*Nstar_combined)
-#     sigma_m = (sigmaI - m * sigma0)
-#     Nstar_combined = alpha_pr*Nstar_pr + alpha_pyneg*Nstar_py + alpha_pypos*Nstar_py
     m_pr = (NQLL0 -(Nbar-Nstar_pr))/(2*Nstar_pr); sigma_m_pr = (sigmaI - m_pr * sigma0_pr)    
     m_py = (NQLL0 -(Nbar-Nstar_py))/(2*Nstar_py); sigma_m_py = (sigmaI - m_py * sigma0_py)
     sigma_m = alpha_pyneg*sigma_m_py + alpha_pypos*sigma_m_py + alpha_pr*sigma_m_pr
