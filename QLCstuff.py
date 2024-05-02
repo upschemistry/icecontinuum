@@ -70,31 +70,51 @@ def pypr_getDeltaNQLL(Ntot_pr,Ntot_pyneg,Ntot_pypos,alpha_pr,alpha_pyneg,alpha_p
     NQLL_eq = alpha_pr*NQLL_eq_pr + alpha_pyneg*NQLL_eq_pyneg + alpha_pypos*NQLL_eq_pypos
     return NQLL_pr - NQLL_eq
 
-def pypr_solve_ivp(t, y, scalar_params, sigmaI, j2_list, x_QLC):
+def pypr_solve_ivp(t, y, scalar_params, sigmaI, j_list, j2_list, x_QLC):
     Nbar, Nstar_pr, Nstar_py, sigma0_pr, sigma0_py, nu_kin_mlyperus, DoverdeltaX2, tau_eq, \
     theta, beta_trans, delta_beta, \
-    h_pr, h_py = scalar_params
+    h_pr, h_py, microfacets = scalar_params
     l = int(len(y)/2)
     NQLL0 = NQLL_pr = y[:l]
     Ntot0 = Ntot_pr = y[l:]
+    
+    if microfacets == 1.0:
 
-    # The microfacet weightings
-    z_pr = h_pr * Ntot_pr
-    dx = x_QLC[1]-x_QLC[0]
-    beta = np.gradient(z_pr,dx)
-    alpha_pyneg = get_alpha(beta,-beta_trans,delta_beta)
-    alpha_pypos = 1-get_alpha(beta, beta_trans,delta_beta)
-    alpha_pr = 1 - alpha_pyneg - alpha_pypos
+        # Use microfacet weightings
+        z_pr = h_pr * Ntot_pr
+        
+    #   Using numpy's gradient method to get the first derivative of (scaled) Ntot
+        dx = x_QLC[1]-x_QLC[0]
+        beta = np.gradient(z_pr,dx)
+    #   Using a Fourier transform method to get the first derivative of (scaled) Ntot
+#         Z_pr = rfft(z_pr)
+#         dZpr_dx = 1j*Z_pr*j_list
+#         L = x_QLC[-1]
+#         beta = irfft(dZpr_dx)*np.pi/L
+
+        # Calculating the weights
+        alpha_pyneg = get_alpha(beta,-beta_trans,delta_beta)
+        alpha_pypos = (1-get_alpha(beta, beta_trans,delta_beta))
+        alpha_pr = 1 - alpha_pyneg - alpha_pypos
  
-    # Ntot deposition
-    m_pr = (NQLL0 -(Nbar-Nstar_pr))/(2*Nstar_pr); sigma_m_pr = (sigmaI - m_pr * sigma0_pr)    
-    m_py = (NQLL0 -(Nbar-Nstar_py))/(2*Nstar_py); sigma_m_py = (sigmaI - m_py * sigma0_py)
-    sigma_m = alpha_pyneg*sigma_m_py + alpha_pypos*sigma_m_py + alpha_pr*sigma_m_pr
+        # Ntot deposition
+        m_pr = (NQLL0 -(Nbar-Nstar_pr))/(2*Nstar_pr)
+        sigma_m_pr = (sigmaI - m_pr * sigma0_pr)    
+        m_py = (NQLL0 -(Nbar-Nstar_py))/(2*Nstar_py); 
+        sigma_m_py = (sigmaI - m_py * sigma0_py)
+        sigma_m = alpha_pyneg*sigma_m_py + alpha_pypos*sigma_m_py + alpha_pr*sigma_m_pr
+        
+    else:
+        m_pr = (NQLL0 -(Nbar-Nstar_pr))/(2*Nstar_pr)
+        sigma_m = (sigmaI - m_pr * sigma0_pr) 
+    
+    # Deposition from air
     dNtot_dt = nu_kin_mlyperus * sigma_m
 
     # Diffusion term based on FT
     Dcoefficient1 = 4*DoverdeltaX2/l**2*np.pi**2
     bj_list = rfft(NQLL0)
+#     bj_list = np.real(rfft(NQLL0)) # this creates instabilities, don't know why
     cj_list = bj_list*j2_list
     dy = -Dcoefficient1  * irfft(cj_list)
 
@@ -102,11 +122,14 @@ def pypr_solve_ivp(t, y, scalar_params, sigmaI, j2_list, x_QLC):
     dNtot_dt += dy
 
     # NQLL
-    Ntot_pyneg = 1/h_py * (np.cos(theta)*h_pr* Ntot_pr -np.sin(theta)*x_QLC)
-    Ntot_pypos = 1/h_py * (np.cos(theta)*h_pr* Ntot_pr +np.sin(theta)*x_QLC)
-    dNQLL_dt = dNtot_dt - pypr_getDeltaNQLL(\
-        Ntot_pr,Ntot_pyneg,Ntot_pypos,alpha_pr,alpha_pyneg,alpha_pypos,Nstar_pr,Nstar_py,Nbar,NQLL_pr)\
-        /tau_eq
+    if microfacets:
+        Ntot_pyneg = 1/h_py * (np.cos(theta)*h_pr* Ntot_pr -np.sin(theta)*x_QLC)
+        Ntot_pypos = 1/h_py * (np.cos(theta)*h_pr* Ntot_pr +np.sin(theta)*x_QLC)
+        dNQLL_dt = dNtot_dt - pypr_getDeltaNQLL(\
+            Ntot_pr,Ntot_pyneg,Ntot_pypos,alpha_pr,alpha_pyneg,alpha_pypos,Nstar_pr,Nstar_py,Nbar,NQLL_pr)\
+            /tau_eq
+    else:
+        dNQLL_dt = dNtot_dt - getDeltaNQLL(Ntot0,Nstar_pr,Nbar,NQLL0)/tau_eq
     
     # Package for output
     derivs = np.empty(2*l)
@@ -121,7 +144,7 @@ def run_pypr(\
            theta, beta_trans_factor, Nstarfactor, h_pr, h_pyfactor, sigma0factor,\
            sigmaI, x_QLC,\
            AssignQuantity,\
-           verbose=0, odemethod='RK45'):
+           verbose=0, odemethod='RK45', microfacets=0):
 
     """ Solves the QLC-2 problem with pyramidal as well as prismatic facet possibilities. """
 
@@ -154,7 +177,7 @@ def run_pypr(\
     scalar_params = np.array(\
       [Nbar, Nstar_pr, Nstar_py, sigma0_pr, sigma0_py, nu_kin_mlyperus.magnitude, Doverdeltax2.magnitude, tau_eq.magnitude, \
        theta.magnitude, beta_trans.magnitude, delta_beta.magnitude,
-       h_pr.magnitude, h_py.magnitude])
+       h_pr.magnitude, h_py.magnitude, microfacets])
 
     # Loop over times
     for i in range(0,nt-1):
@@ -171,7 +194,7 @@ def run_pypr(\
         
         # Integrate up to next time step
         sol = solve_ivp(\
-            pypr_solve_ivp, tinterval, ylast, args=(scalar_params, sigmaI_mag, j2_list, x_QLC_mag), \
+            pypr_solve_ivp, tinterval, ylast, args=(scalar_params, sigmaI_mag, j_list, j2_list, x_QLC_mag), \
             rtol=1e-12, method=odemethod) 
         ylast = sol.y[:,-1]
         
