@@ -78,9 +78,10 @@ def pypr_solve_ivp(t, y, scalar_params, sigmaI, j_list, j2_list, x_QLC):
     NQLL0 = NQLL_pr = y[:l]
     Ntot0 = Ntot_pr = y[l:]
     
+    # Deposition from air
     if microfacets == 1.0:
 
-        # Use microfacet weightings
+        # Get heights in micrometers
         z_pr = h_pr * Ntot_pr
         
     #   Using numpy's gradient method to get the first derivative of (scaled) Ntot
@@ -94,7 +95,7 @@ def pypr_solve_ivp(t, y, scalar_params, sigmaI, j_list, j2_list, x_QLC):
 
         # Calculating the weights
         alpha_pyneg = get_alpha(beta,-beta_trans,delta_beta)
-        alpha_pypos = (1-get_alpha(beta, beta_trans,delta_beta))
+        alpha_pypos = 1-get_alpha(beta, beta_trans,delta_beta)
         alpha_pr = 1 - alpha_pyneg - alpha_pypos
  
         # Ntot deposition
@@ -108,21 +109,24 @@ def pypr_solve_ivp(t, y, scalar_params, sigmaI, j_list, j2_list, x_QLC):
         m_pr = (NQLL0 -(Nbar-Nstar_pr))/(2*Nstar_pr)
         sigma_m = (sigmaI - m_pr * sigma0_pr) 
     
-    # Deposition from air
     dNtot_dt = nu_kin_mlyperus * sigma_m
 
-    # Diffusion term based on FT
+    # Diffusion term (based on FT)
     Dcoefficient1 = 4*DoverdeltaX2/l**2*np.pi**2
+    if microfacets == 1.0:
+        slopes = np.ones(len(x_QLC)) + 1j*beta
+        angles = np.angle(slopes) # Default is radians
+        costerm = np.cos(angles)
+        Dcoefficient1 *= costerm**2
     bj_list = rfft(NQLL0)
-#     bj_list = np.real(rfft(NQLL0)) # this creates instabilities, don't know why
     cj_list = bj_list*j2_list
     dy = -Dcoefficient1  * irfft(cj_list)
 
-    # Combined
+    # Diffusion + Deposition
     dNtot_dt += dy
 
     # NQLL
-    if microfacets:
+    if microfacets == 1.0:
         Ntot_pyneg = 1/h_py * (np.cos(theta)*h_pr* Ntot_pr -np.sin(theta)*x_QLC)
         Ntot_pypos = 1/h_py * (np.cos(theta)*h_pr* Ntot_pr +np.sin(theta)*x_QLC)
         dNQLL_dt = dNtot_dt - pypr_getDeltaNQLL(\
@@ -161,8 +165,10 @@ def run_pypr(\
     bj_list = rfft(NQLL_init_1D)
     j_list = np.array([j for j in range(len(bj_list))])
     j2_list = np.array(j_list)**2
+#     j2_list[-20:-1] = 0
+#     j2_list[-1] = 0
     
-    # Integration prem having to do with multiple microfacets
+    # Integration prep having to do with multiple microfacets
     theta.ito('radian')
     beta_trans = np.sin(theta/2)/np.cos(theta/2)
     delta_beta = beta_trans/beta_trans_factor
