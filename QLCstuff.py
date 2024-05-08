@@ -145,7 +145,7 @@ def pypr_solve_ivp(t, y, scalar_params, sigmaI, j_list, j2_list, x_QLC):
 
     return derivs
 
-def smoothout(x_QLC,Ntot_pr,deltax,d2Ntot_dx2_threshold):
+def smoothout(x_QLC,Ntot_pr,deltax,d2Ntot_dx2_threshold,verbose=0):
     dNtot_dx = np.gradient(Ntot_pr,deltax)#; print(dNtot_dx.units)
     d2Ntot_dx2 = np.gradient(dNtot_dx,deltax)#; print(d2Ntot_dx2.units)
     ismoothlist = np.argwhere(d2Ntot_dx2<-d2Ntot_dx2_threshold)
@@ -154,9 +154,10 @@ def smoothout(x_QLC,Ntot_pr,deltax,d2Ntot_dx2_threshold):
     Ntot_pr_smoothed = np.copy(Ntot_pr)
     nbefore = 2; #print(nbefore)
     nafter = nbefore+1; #print(nafter)
+    nx = len(x_QLC)
 
     for ismooth in ismoothlist:
-        if ismooth >= nbefore and ismooth <= len(x_QLC)-nafter:
+        if ismooth >= nbefore and ismooth <= nx-nafter:
             x = x_QLC[ismooth-nbefore:ismooth+nafter]; #print("here is x", x)
             x = np.delete(x,nbefore); #print("here is x", x)
             y = Ntot_pr[ismooth-nbefore:ismooth+nafter]; #print("here is y",y)
@@ -164,13 +165,24 @@ def smoothout(x_QLC,Ntot_pr,deltax,d2Ntot_dx2_threshold):
             spl = myinterpolator(x,y)
             ynew = spl(x[nbefore]) # same as spl(x_QLC[ismooth])
             Ntot_pr_smoothed[ismooth] = ynew
+
+        elif ismooth == nx-2:
+            if verbose > 0:
+                print('Linear smoothing at the end of the array')
+            Ntot_pr_smoothed[ismooth] = (Ntot_pr[-3]+Ntot_pr[-1])/2
+
+        elif ismooth == 1:
+            if verbose > 0:
+                print('Linear smoothing at the beginning of the array')
+            Ntot_pr_smoothed[ismooth] = (Ntot_pr[0]+Ntot_pr[2])/2
+                 
     return d2Ntot_dx2, Ntot_pr_smoothed
 
 def run_pypr(\
            NQLL_init_1D,Ntot_init_1D,times,\
            Nbar, Nstar, sigma0, nu_kin_mlyperus, Doverdeltax2, tau_eq, \
            theta, beta_trans_factor, Nstarfactor, h_pr, h_pyfactor, sigma0factor,\
-           sigmaI, x_QLC,\
+           sigmaI, x_QLC, d2Ntot_dx2_threshold,\
            AssignQuantity,\
            verbose=0, odemethod='RK45', microfacets=0):
 
@@ -189,8 +201,6 @@ def run_pypr(\
     bj_list = rfft(NQLL_init_1D)
     j_list = np.array([j for j in range(len(bj_list))])
     j2_list = np.array(j_list)**2
-#     j2_list[-20:-1] = 0
-#     j2_list[-1] = 0
     
     # Integration prep having to do with multiple microfacets
     theta.ito('radian')
@@ -204,8 +214,8 @@ def run_pypr(\
     sigma0_py = sigma0*sigma0factor
     
     # This is prep for attempting to smooth Ntot
-    d2Ntot_dx2_threshold = 10000
-    deltax = x_QLC_mag[1]-x_QLC_mag[0]
+    deltax_mag = x_QLC_mag[1]-x_QLC_mag[0]
+    d2Ntot_dx2_threshold_mag = d2Ntot_dx2_threshold.magnitude
 
     # Bundle parameters for ODE solver
     scalar_params = np.array(\
@@ -219,13 +229,6 @@ def run_pypr(\
         # Specify the time interval of this step
         tinterval = [times[i].magnitude,times[i+1].magnitude]
         
-        if verbose > 0:
-            print(tinterval)
-            print(ylast)
-            print(scalar_params)
-            print(sigmaI_mag)
-            print(odemethod)
-        
         # Integrate up to next time step
         sol = solve_ivp(\
             pypr_solve_ivp, tinterval, ylast, args=(scalar_params, sigmaI_mag, j_list, j2_list, x_QLC_mag), \
@@ -237,7 +240,7 @@ def run_pypr(\
         ylast_1Darray_reshaped = np.reshape(ylast_1Darray,(2,nx))
         Ntot_pr = ylast_1Darray_reshaped[1,:]; #print('Ntot_pr has shape', np.shape(Ntot_pr))
         NQLL_pr = ylast_1Darray_reshaped[0,:]; #print('NQLL_pr has shape', np.shape(NQLL_pr))
-        d2Ntot_dx2, Ntot_pr_smoothed = smoothout(x_QLC_mag,Ntot_pr,deltax,d2Ntot_dx2_threshold)
+        d2Ntot_dx2, Ntot_pr_smoothed = smoothout(x_QLC_mag,Ntot_pr,deltax_mag,d2Ntot_dx2_threshold_mag,verbose)
         ylast = np.array([NQLL_pr,Ntot_pr_smoothed])
         ylast = np.reshape(ylast,2*nx)
 
