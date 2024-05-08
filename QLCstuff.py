@@ -6,6 +6,9 @@ from numba import njit, float64, int32, types
 from matplotlib import rcParams
 from time import time
 from scipy.fft import fft, ifft, rfft, irfft, fftfreq
+from scipy.interpolate import CubicSpline
+myinterpolator = CubicSpline
+
 
 ticklabelsize = 15
 linewidth = 1
@@ -142,6 +145,27 @@ def pypr_solve_ivp(t, y, scalar_params, sigmaI, j_list, j2_list, x_QLC):
 
     return derivs
 
+def smoothout(x_QLC,Ntot_pr,deltax,d2Ntot_dx2_threshold):
+    dNtot_dx = np.gradient(Ntot_pr,deltax)#; print(dNtot_dx.units)
+    d2Ntot_dx2 = np.gradient(dNtot_dx,deltax)#; print(d2Ntot_dx2.units)
+    ismoothlist = np.argwhere(d2Ntot_dx2<-d2Ntot_dx2_threshold)
+    ismoothlist = ismoothlist.reshape(-1)
+    print('Shape of the smooth list is ', ismoothlist.shape)
+    Ntot_pr_smoothed = np.copy(Ntot_pr)
+    nbefore = 2; #print(nbefore)
+    nafter = nbefore+1; #print(nafter)
+
+    for ismooth in ismoothlist:
+        if ismooth >= nbefore and ismooth <= len(x_QLC)-nafter:
+            x = x_QLC[ismooth-nbefore:ismooth+nafter]; #print("here is x", x)
+            x = np.delete(x,nbefore); #print("here is x", x)
+            y = Ntot_pr[ismooth-nbefore:ismooth+nafter]; #print("here is y",y)
+            y = np.delete(y,nbefore); #print("here is y", y)
+            spl = myinterpolator(x,y)
+            ynew = spl(x[nbefore]) # same as spl(x_QLC[ismooth])
+            Ntot_pr_smoothed[ismooth] = ynew
+    return d2Ntot_dx2, Ntot_pr_smoothed
+
 def run_pypr(\
            NQLL_init_1D,Ntot_init_1D,times,\
            Nbar, Nstar, sigma0, nu_kin_mlyperus, Doverdeltax2, tau_eq, \
@@ -178,6 +202,10 @@ def run_pypr(\
     Nstar_py = Nstar_pr*Nstarfactor
     sigma0_pr = sigma0
     sigma0_py = sigma0*sigma0factor
+    
+    # This is prep for attempting to smooth Ntot
+    d2Ntot_dx2_threshold = 10000
+    deltax = x_QLC_mag[1]-x_QLC_mag[0]
 
     # Bundle parameters for ODE solver
     scalar_params = np.array(\
@@ -204,6 +232,15 @@ def run_pypr(\
             rtol=1e-12, method=odemethod) 
         ylast = sol.y[:,-1]
         
+        # Smoothing
+        ylast_1Darray = np.array(ylast, np.float64); 
+        ylast_1Darray_reshaped = np.reshape(ylast_1Darray,(2,nx))
+        Ntot_pr = ylast_1Darray_reshaped[1,:]; #print('Ntot_pr has shape', np.shape(Ntot_pr))
+        NQLL_pr = ylast_1Darray_reshaped[0,:]; #print('NQLL_pr has shape', np.shape(NQLL_pr))
+        d2Ntot_dx2, Ntot_pr_smoothed = smoothout(x_QLC_mag,Ntot_pr,deltax,d2Ntot_dx2_threshold)
+        ylast = np.array([NQLL_pr,Ntot_pr_smoothed])
+        ylast = np.reshape(ylast,2*nx)
+
         # Stuff into keeper arrays
         ykeep_1D.append(ylast)
         
