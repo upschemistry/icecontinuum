@@ -9,7 +9,6 @@ from scipy.fft import fft, ifft, rfft, irfft, fftfreq
 from scipy.interpolate import CubicSpline
 myinterpolator = CubicSpline
 
-
 ticklabelsize = 15
 linewidth = 1
 fontsize = 15
@@ -62,7 +61,6 @@ def getNQLL(Ntot,Nstar,Nbar):
 
 @njit
 def getDeltaNQLL(Ntot,Nstar,Nbar,NQLL):
-#     return NQLL-getNQLL(Ntot,Nstar,Nbar)
     return NQLL - (Nbar - Nstar*np.sin(2*np.pi*Ntot))
 
 @njit
@@ -81,21 +79,13 @@ def pypr_solve_ivp(t, y, scalar_params, sigmaI, j_list, j2_list, x_QLC):
     NQLL0 = NQLL_pr = y[:l]
     Ntot0 = Ntot_pr = y[l:]
     
+    # Using numpy's gradient method to get the first derivative of (scaled) Ntot
+    z_pr = h_pr * Ntot_pr
+    dx = x_QLC[1]-x_QLC[0]
+    beta = np.gradient(z_pr,dx)
+    
     # Deposition from air
     if microfacets == 1.0:
-
-        # Get heights in micrometers
-        z_pr = h_pr * Ntot_pr
-        
-    #   Using numpy's gradient method to get the first derivative of (scaled) Ntot
-        dx = x_QLC[1]-x_QLC[0]
-        beta = np.gradient(z_pr,dx)
-    #   Using a Fourier transform method to get the first derivative of (scaled) Ntot
-#         Z_pr = rfft(z_pr)
-#         dZpr_dx = 1j*Z_pr*j_list
-#         L = x_QLC[-1]
-#         beta = irfft(dZpr_dx)*np.pi/L
-
         # Calculating the weights
         alpha_pyneg = get_alpha(beta,-beta_trans,delta_beta)
         alpha_pypos = 1-get_alpha(beta, beta_trans,delta_beta)
@@ -106,26 +96,19 @@ def pypr_solve_ivp(t, y, scalar_params, sigmaI, j_list, j2_list, x_QLC):
         sigma_m_pr = (sigmaI - m_pr * sigma0_pr)    
         m_py = (NQLL0 -(Nbar-Nstar_py))/(2*Nstar_py); 
         sigma_m_py = (sigmaI - m_py * sigma0_py)
-        sigma_m = alpha_pyneg*sigma_m_py + alpha_pypos*sigma_m_py + alpha_pr*sigma_m_pr
-        
+        sigma_m = alpha_pyneg*sigma_m_py + alpha_pypos*sigma_m_py + alpha_pr*sigma_m_pr  
     else:
         m_pr = (NQLL0 -(Nbar-Nstar_pr))/(2*Nstar_pr)
         sigma_m = (sigmaI - m_pr * sigma0_pr) 
-    
     dNtot_dt = nu_kin_mlyperus * sigma_m
 
-    # Diffusion term (based on FT)
-    Dcoefficient1 = 4*DoverdeltaX2/l**2*np.pi**2
-    if microfacets == 1.0:
-        slopes = np.ones(len(x_QLC)) + 1j*beta
-        angles = np.angle(slopes) # Default is radians
-        costerm = np.cos(angles)
-        Dcoefficient1 *= costerm**2
+    # Add in surface diffusion (based on FT)
+    angles = np.arctan(beta) # Default is radians
+    costerm = np.cos(angles)
+    Dcoefficient1 = 4*DoverdeltaX2/l**2*np.pi**2 *costerm**2
     bj_list = rfft(NQLL0)
     cj_list = bj_list*j2_list
     dy = -Dcoefficient1  * irfft(cj_list)
-
-    # Diffusion + Deposition
     dNtot_dt += dy
 
     # NQLL
@@ -210,8 +193,8 @@ def run_pypr(\
     h_py = h_pr*h_pyfactor
     Nstar_pr = Nstar
     Nstar_py = Nstar_pr*Nstarfactor
-    sigma0_pr = sigma0
-    sigma0_py = sigma0*sigma0factor
+    sigma0_pr = sigma0.magnitude
+    sigma0_py = sigma0.magnitude*sigma0factor
     
     # This is prep for attempting to smooth Ntot
     deltax_mag = x_QLC_mag[1]-x_QLC_mag[0]
@@ -495,7 +478,7 @@ def report_1d_growth_results(\
                 plt.xlim(xlim)
                 i = np.where( (x_QLC.magnitude > xlim[0]) &  (x_QLC.magnitude < xlim[1]) )[0]
                 ymin = Nicekeep_1D[itime,:][i].min()
-                ymax = Nicekeep_1D[itime,:][i].max()
+                ymax = Ntotkeep_1D[itime,:][i].max()
                 plt.ylim( ymin, ymax ) 
             if vlayers != 0:
                 ymin = Nicekeep_1D[itime,:][i].min()
@@ -608,3 +591,10 @@ def fillin(un,ixbox,iybox,overrideflag=0,overrideval=0):
 #     NQLL_eq = alpha_pr*NQLL_eq_pr + alpha_pyneg*NQLL_eq_pyneg + alpha_pypos*NQLL_eq_pypos
 #     return NQLL_eq
     
+#     Using a Fourier transform method to get the first derivative of (scaled) Ntot
+#     Z_pr = rfft(z_pr)
+#     dZpr_dx = 1j*Z_pr*j_list
+#     L = x_QLC[-1]
+#     beta = irfft(dZpr_dx)*np.pi/L
+
+
