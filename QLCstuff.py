@@ -133,7 +133,8 @@ def smoothout(x_QLC,Ntot_pr,deltax,d2Ntot_dx2_threshold,verbose=0):
     d2Ntot_dx2 = np.gradient(dNtot_dx,deltax)#; print(d2Ntot_dx2.units)
     ismoothlist = np.argwhere(d2Ntot_dx2<-d2Ntot_dx2_threshold)
     ismoothlist = ismoothlist.reshape(-1)
-    print('Shape of the smooth list is ', ismoothlist.shape)
+    if verbose > 0:
+        print('Shape of the smooth list is ', ismoothlist.shape)
     Ntot_pr_smoothed = np.copy(Ntot_pr)
     nbefore = 2; #print(nbefore)
     nafter = nbefore+1; #print(nafter)
