@@ -38,7 +38,7 @@ These parameters mimic the "GI parameters - Reference limit cycle", but with mic
 &RT
    runtime = 300
    runtime_units = 'ms'
-   ntimes = 100
+   ntimes = 50
    verbose = 1
 /
 
