@@ -1,4 +1,4 @@
-These parameters activate a 5-degree microfaceting scheme, in which the microfacet is subsaturated (i.e., can't grow).
+These parameters activate a 5-degree microfaceting scheme, in which the microfacet is subsaturated (i.e., can/Users/nesh/Documents/Repositories/icecontinuum/2024 - Nesh/Ntot.mp4't grow).
 
 &GI
    sigma0 = 20
@@ -36,9 +36,9 @@ These parameters activate a 5-degree microfaceting scheme, in which the microfac
 /
 
 &RT
-   runtime = 2000
+   runtime = 4000
    runtime_units = 'ms'
-   ntimes = 100
+   ntimes = 200
    verbose = 1
 /
 
