@@ -38,7 +38,7 @@ These parameters activate a 5-degree microfaceting scheme, in which the microfac
 &RT
    runtime = 4000
    runtime_units = 'ms'
-   ntimes = 100
+   ntimes = 200
    verbose = 1
 /
 
