@@ -22,9 +22,7 @@ These parameters lay out a standard limit-cycle scenario.
    L_units = 'micrometer'   
    d2Ntot_dx2_threshold = 10000
    d2Ntot_dx2_threshold_units = '1/micrometer^2'
-   odemethod = 'RK45'
-   runtime = 300
-   runtime_units = 'ms' 
+   odemethod = 'RK45' 
    microfacets = 0
 / 
 
