@@ -1,0 +1,46 @@
+These parameters mimic the "GI parameters - Reference limit cycle", but with microfaceting activated.
+
+&GI
+   sigma0 = 20
+   sigma0_units = 'percent'
+   sigmaI_corner = 23
+   sigmaI_corner_units = 'percent'
+   c_r = 0.5
+   c_r_units = 'percent'
+   nu_kin = 70
+   nu_kin_units = 'micrometer/second'
+   tau_eq = 5
+   tau_eq_units = 'microsecond'
+   nx_crystal = 320 
+   Nbar = 1
+   Nstar = .1
+   h_pr = 0.389
+   h_pr_units = 'nanometer'
+   D = 3.65e-04
+   D_units = 'micrometer^2/microsecond'
+   L = 30
+   L_units = 'micrometer'   
+   d2Ntot_dx2_threshold = 10000
+   d2Ntot_dx2_threshold_units = '1/micrometer^2'
+   odemethod = 'RK45'   
+   microfacets = 1
+/ 
+
+&MF
+   sigma0factor = 1.1
+   h_pyfactor = 1
+   Nstarfactor = 0.9
+   theta = 5
+   theta_units = 'degree'
+   beta_trans_factor = 10
+/
+
+&RT
+   runtime = 300
+   runtime_units = 'ms'
+   ntimes = 50
+   verbose = 1
+/
+
+Notes:
+Limit cycle is achieved after about 200 ms
