@@ -100,6 +100,33 @@ def propagate(u0,ixbox,iybox,udirichlet,uneumannx,uneumanny,Dxeff,Dyeff):
         
     return un
 
+def propagate_asymmetric(u0,ixbox,iybox,udirichlet,uneumannx_left,uneumannx_right,uneumanny,Dxeff,Dyeff):
+    
+    # Diffusion
+    un = np.empty(np.shape(u0))
+    un[1:-1, 1:-1] = u0[1:-1, 1:-1] + ( \
+    (u0[2:, 1:-1] - 2*u0[1:-1, 1:-1] + u0[:-2, 1:-1])*Dxeff + \
+    (u0[1:-1, 2:] - 2*u0[1:-1, 1:-1] + u0[1:-1, :-2])*Dyeff )
+
+    # Dirichlet outer boundary
+    un[[0,-1],:]=udirichlet
+    un[:,[0,-1]]=udirichlet
+        
+    # Pull out the stop and start indices
+    ixmin = ixbox.start
+    ixmax = ixbox.stop-1
+    iymin = iybox.start
+    iymax = iybox.stop-1
+
+    # Inner boundary: diffusion and Neumann
+    un[ixmin-1,iybox] = u0[ixmin-1,iybox] +(u0[ixmin-2,iybox] - u0[ixmin-1,iybox])*Dxeff -uneumannx_left
+    un[ixmax+1,iybox] = u0[ixmax+1,iybox] +(u0[ixmax+2,iybox] - u0[ixmax+1,iybox])*Dxeff -uneumannx_right
+
+    un[ixbox,iymin-1] = u0[ixbox,iymin-1] +(u0[ixbox,iymin-2] - u0[ixbox,iymin-1])*Dyeff -uneumanny
+    un[ixbox,iymax+1] = u0[ixbox,iymax+1] +(u0[ixbox,iymax+2] - u0[ixbox,iymax+1])*Dyeff -uneumanny
+        
+    return un
+
 def propagate_vaporfield_Euler_x1d(u0,udirichlet,uneumann,Deff):
     
     # Diffusion ... indices [1:-1] exclude the first and the last ...
