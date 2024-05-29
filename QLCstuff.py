@@ -313,7 +313,8 @@ def run_f1d(\
     j2_list = np.array(j_list)**2
 
     # Bundle parameters for ODE solver
-    scalar_params = np.array([Nbar, Nstar, sigma0, nu_kin_mlyperus.magnitude, Doverdeltax2.magnitude, tau_eq.magnitude])
+    scalar_params = np.array(\
+            [Nbar, Nstar, sigma0.magnitude, nu_kin_mlyperus.magnitude, Doverdeltax2.magnitude, tau_eq.magnitude])
 
     # Loop over times
     for i in range(0,nt-1):
