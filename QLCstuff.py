@@ -122,11 +122,8 @@ def pypr_solve_ivp(t, y, scalar_params, sigmaI, j_list, j2_list, x_QLC):
         dNQLL_dt = dNtot_dt - getDeltaNQLL(Ntot0,Nstar_pr,Nbar,NQLL0)/tau_eq
     
     # Package for output
-    derivs = np.empty(2*l)
-    derivs[:l] = dNQLL_dt
-    derivs[l:] = dNtot_dt
+    return np.concatenate((dNQLL_dt, dNtot_dt))
 
-    return derivs
 
 def smoothout(x_QLC,Ntot_pr,deltax,d2Ntot_dx2_threshold,verbose=0):
     dNtot_dx = np.gradient(Ntot_pr,deltax)#; print(dNtot_dx.units)
@@ -285,11 +282,7 @@ def f1d_solve_ivp(t, y, scalar_params, sigmaI, j2_list):
     dNQLL_dt = dNtot_dt - getDeltaNQLL(Ntot0,Nstar,Nbar,NQLL0)/tau_eq
     
     # Package for output
-    derivs = np.empty(2*l)
-    derivs[:l] = dNQLL_dt
-    derivs[l:] = dNtot_dt
-
-    return derivs
+    return np.concatenate((dNQLL_dt, dNtot_dt))
 
 def run_f1d(\
            NQLL_init_1D,Ntot_init_1D,times,\
