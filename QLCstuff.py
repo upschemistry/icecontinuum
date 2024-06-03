@@ -577,6 +577,119 @@ def fillin(un,ixbox,iybox,overrideflag=0,overrideval=0):
     un[ixbox,iybox] = border
     return un
 
+def run_f1d_FT(\
+           NQLL_init_1D,Ntot_init_1D,times,\
+           Nbar, Nstar, sigma0, nu_kin_mlyperus, DoverL2pi2, tau_eq, sigmaI,\
+           AssignQuantity,\
+           verbose=0, odemethod='RK45'):
+
+    """ Solves the QLC problem, with units, in Fourier space """
+
+    # Prep for the integration
+    nt = len(times)
+    lastprogress = 0
+    sigmaI_mag = sigmaI.magnitude
+    SigmaI_mag = rfft(sigmaI_mag)
+    t1 = time()
+    
+    # This is to get j2_list because it's more efficient to pre-calculate it (but we'll use bj_list later too)
+    bj_list = rfft(NQLL_init_1D)
+    n_list = len(bj_list)
+    j_list = np.array([j for j in range(n_list)])
+    j2_list = np.array(j_list)**2
+    
+    l = int(len(NQLL_init_1D)/2)
+    cos_series = 1
+    for i in range(len(NQLL_init_1D) - 1):
+        cos_series += np.cos((i + 1) * j_list * np.pi / l)
+#     print('cos_series',cos_series)
+
+    # Bundle parameters for ODE solver
+    scalar_params = np.array([\
+       Nbar, Nstar, sigma0.magnitude, nu_kin_mlyperus.magnitude, DoverL2pi2.magnitude, tau_eq.magnitude])
+
+    # Package up the dynamical variables as FT 
+    aj_list = rfft(Ntot_init_1D)
+    Ylast = np.array([bj_list,aj_list])
+    Ylast = np.reshape(Ylast,2*n_list)
+    Ykeep_1D = [Ylast]
+        
+    # Loop over times
+    for i in range(0,nt-1):
+                
+        # Specify the time interval of this step
+        tinterval = [times[i].magnitude,times[i+1].magnitude]
+        
+        # Integrate up to next time step
+        sol = solve_ivp(\
+            f1d_solve_ivp_FT, tinterval, Ylast, args=(scalar_params, SigmaI_mag, j2_list), \
+            rtol=1e-12, method=odemethod) 
+        Ylast = sol.y[:,-1]
+        
+        # Stuff into keeper arrays
+        Ykeep_1D.append(Ylast)
+        
+        # Progress reporting
+        progress = int(i/nt*100)
+        if np.mod(progress,10) == 0:
+            if progress > lastprogress:
+                t2 = time()
+                elapsed = (t2 - t1)/60
+                print(progress,'%'+' elapsed time is %.3f minutes' %elapsed)
+                lastprogress = progress
+
+    print('100% done')
+    print('status = ', sol.status)
+    print('message = ', sol.message)
+    print(dir(sol))
+    
+    # Packaging up the dynamical variables over time
+    Ykeep_1Darr = np.array(Ykeep_1D, dtype=np.complex_)
+    Ykeep_1Darr_reshaped = np.reshape(Ykeep_1Darr,(nt,2,n_list))
+    Ykeep_Ntot_1D = Ykeep_1Darr_reshaped[:,1,:]
+    Ykeep_NQLL_1D = Ykeep_1Darr_reshaped[:,0,:]
+    
+    # Convert to Cartesian values
+    Ntotkeep_1D = irfft(Ykeep_Ntot_1D)
+    NQLLkeep_1D = irfft(Ykeep_NQLL_1D)
+    
+    # Return the Cartesian values    
+    return Ntotkeep_1D, NQLLkeep_1D
+
+def f1d_solve_ivp_FT(t, Y, scalar_params, SigmaI, j2_list):
+
+    # Unpack parameters
+    Nbar, Nstar, sigma0, nu_kin_mlyperus, Dcoefficient1, tau_eq = scalar_params
+    l = int(len(Y)/2)
+
+    # Extract the dynamical variables
+    bj_list = Y[:l]
+    aj_list = Y[l:]
+    
+    # Convert some variables to position space
+    NQLL0 = irfft(bj_list)
+    Ntot0 = irfft(aj_list)
+    nx_crystal = len(Ntot0)
+
+    # Start with the diffusion term for Ntot
+    cj_list = bj_list*j2_list
+    daj_list_dt = -Dcoefficient1 * cj_list
+    
+    # Add in the deposition term
+    M = bj_list/(2*Nstar)
+    M[0] -= (Nbar - Nstar)/(2*Nstar)*nx_crystal  
+    Sigma_m = (SigmaI - M * sigma0)
+    Deposition_term = nu_kin_mlyperus * Sigma_m
+    daj_list_dt += Deposition_term
+
+    # Freezing/melting for NQLL (awkwardly done by reverse/forward FT -- but we may be stuck with this)
+    deltaNQLL = getDeltaNQLL(Ntot0,Nstar,Nbar,NQLL0)
+    DeltaNQLL = rfft(deltaNQLL)
+    dbj_list_dt = daj_list_dt - DeltaNQLL/tau_eq
+
+    # Package up and return
+    return np.concatenate((dbj_list_dt, daj_list_dt))
+
 
 # @njit
 # def pypr_getNQLL(Ntot_pr,Ntot_pyneg,Ntot_pypos,alpha_pr,alpha_pyneg,alpha_pypos,Nstar_pr,Nstar_py,Nbar):

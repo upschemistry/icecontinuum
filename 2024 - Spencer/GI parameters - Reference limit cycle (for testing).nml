@@ -3,7 +3,7 @@ These parameters lay out a standard limit-cycle scenario.
 &GI
    sigma0 = 0.20
    sigma0_units = 'dimensionless'
-   sigmaI_corner = 0.23
+   sigmaI_corner = 0.21
    sigmaI_corner_units = 'dimensionless'
    c_r = 0.005
    c_r_units = 'dimensionless'
@@ -27,7 +27,7 @@ These parameters lay out a standard limit-cycle scenario.
 / 
 
 &RT
-   runtime = 50
+   runtime = 300
    runtime_units = 'ms'
    ntimes = 50
    verbose = 0
