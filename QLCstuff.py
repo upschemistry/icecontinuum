@@ -216,6 +216,20 @@ def run_pypr(\
             rtol=1e-12, method=odemethod) 
         ylast = sol.y[:,-1]
         
+        # Symmetrizing
+        ylast = np.array(ylast, dtype=np.complex_)
+        ylast_reshaped = np.reshape(ylast,(2,nx))
+        NQLL_last = ylast_reshaped[0,:]
+        Ntot_last = ylast_reshaped[1,:]
+        nx_mid = int(nx/2)
+        for j in range(0,nx_mid):
+            jp = nx -j -1
+            Ntot_last[j] = Ntot_last[jp]
+            NQLL_last[j] = NQLL_last[jp]
+        ylast = np.array([NQLL_last,Ntot_last])
+        ylast = np.reshape(ylast,2*nx)
+        ylast = np.real(ylast)
+
         # Smoothing
         ylast_1Darray = np.array(ylast, np.float64); 
         ylast_1Darray_reshaped = np.reshape(ylast_1Darray,(2,nx))
@@ -328,6 +342,20 @@ def run_f1d(\
             rtol=1e-12, method=odemethod) 
         ylast = sol.y[:,-1]
         
+        # Symmetrizing
+        ylast = np.array(ylast, dtype=np.complex_)
+        ylast_reshaped = np.reshape(ylast,(2,nx))
+        NQLL_last = ylast_reshaped[0,:]
+        Ntot_last = ylast_reshaped[1,:]
+        nx_mid = int(nx/2)
+        for j in range(0,nx_mid):
+            jp = nx -j -1
+            Ntot_last[j] = Ntot_last[jp]
+            NQLL_last[j] = NQLL_last[jp]
+        ylast = np.array([NQLL_last,Ntot_last])
+        ylast = np.reshape(ylast,2*nx)
+        ylast = np.real(ylast)
+
         # Stuff into keeper arrays
         ykeep_1D.append(ylast)
         
@@ -340,6 +368,7 @@ def run_f1d(\
                 print(progress,'%'+' elapsed time is %.3f minutes' %elapsed)
                 lastprogress = progress
 
+                
     print('100% done')
     print('status = ', sol.status)
     print('message = ', sol.message)
