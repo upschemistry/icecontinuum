@@ -27,7 +27,7 @@ These parameters lay out a standard limit-cycle scenario.
 / 
 
 &RT
-   runtime = 500
+   runtime = 50
    runtime_units = 'ms'
    ntimes = 50
    verbose = 0
