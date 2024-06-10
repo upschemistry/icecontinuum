@@ -606,6 +606,26 @@ def fillin(un,ixbox,iybox,overrideflag=0,overrideval=0):
     un[ixbox,iybox] = border
     return un
 
+def getDsurf_dePrinzio2020(T,Ea,AssignQuantity):
+    """ Returns D in micrometers^2/microsecond """
+    """ Assumes temperature in degrees K """
+    """ Based on di Prenzio et al, 2020 """
+    D0 = AssignQuantity(3e-9,'m^2/s')
+    T0 = AssignQuantity(273.15-5,'kelvin')
+    R = AssignQuantity(8.314,'J/mol/kelvin')
+    D = D0 * np.exp(Ea/R*(1/T-1/T0))
+    return D
+
+def getDsurf_Price1999(T,Ea,AssignQuantity):
+    """ Returns D in micrometers^2/microsecond """
+    """ Assumes temperature in degrees K """
+    """ Based on di Prenzio et al, 2020 """
+    D0 = AssignQuantity(9.2e-4,'micrometer^2/microsecond')
+    T0 = AssignQuantity(273.15,'kelvin')
+    R = AssignQuantity(8.314,'J/mol/kelvin')
+    D = D0 * np.exp(Ea/R*(1/T-1/T0))
+    return D
+
 def run_f1d_FT(\
            NQLL_init_1D,Ntot_init_1D,times,\
            Nbar, Nstar, sigma0, nu_kin_mlyperus, DoverL2pi2, tau_eq, sigmaI,\
