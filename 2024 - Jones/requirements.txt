@@ -1,0 +1,11 @@
+tensorflow==2.10
+tensorflow-probability==0.18
+scikit-learn==1.4.2
+ipykernel
+matplotlib==3.8.4
+ipympl==0.9.3
+numba
+pint
+plotly
+f90nml
+deepxde
