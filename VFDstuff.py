@@ -127,6 +127,63 @@ def propagate_asymmetric(u0,ixbox,iybox,udirichlet,uneumannx_left,uneumannx_righ
         
     return un
 
+# xvec = (x[ixboxmax].magnitude,x[ixboxmax_new].magnitude)
+# yvec = (y[iyboxmax_new].magnitude,0)
+# plt.plot(xvec,yvec,color='k',linewidth=linewidth)
+# xvec = (x[ixboxmin_new].magnitude,x[ixboxmin].magnitude)
+# yvec = (0,y[iyboxmax_new].magnitude)
+# plt.plot(xvec,yvec,color='b',linewidth=linewidth)
+# xvec = (x[ixboxmin_new].magnitude,x[ixboxmin].magnitude)
+# yvec = (0,y[iyboxmin_new].magnitude)
+# plt.plot(xvec,yvec,color='r',linewidth=linewidth)
+# xvec = (x[ixboxmax].magnitude,x[ixboxmax_new].magnitude)
+# yvec = (y[iyboxmin_new].magnitude,0)
+# plt.plot(xvec,yvec,color='g',linewidth=linewidth)
+# xvec = (x[ixboxmin].magnitude,x[ixboxmax].magnitude)
+# yvec = (y[iyboxmin_new].magnitude,y[iyboxmin_new].magnitude)
+# plt.plot(xvec,yvec,color='c',linewidth=linewidth)
+# xvec = (x[ixboxmin].magnitude,x[ixboxmax].magnitude)
+# yvec = (y[iyboxmax_new].magnitude,y[iyboxmax_new].magnitude)
+# plt.plot(xvec,yvec,color='y',linewidth=linewidth)
+
+def propagate_hexagon(u0,ix01,ix12,ix32,ix43,ix54,ix50,iy01,iy12,iy32,iy43,iy54,iy50,udirichlet,uneumann,Deff):
+    
+    # Diffusion
+    un = np.empty(np.shape(u0))
+    un[1:-1, 1:-1] = u0[1:-1, 1:-1] + ( \
+    (u0[2:, 1:-1] - 2*u0[1:-1, 1:-1] + u0[:-2, 1:-1])*Deff + \
+    (u0[1:-1, 2:] - 2*u0[1:-1, 1:-1] + u0[1:-1, :-2])*Deff )
+
+    # Dirichlet outer boundary
+    un[[0,-1],:]=udirichlet
+    un[:,[0,-1]]=udirichlet
+        
+    # Pull out the stop and start indices
+#     ixmin = ixbox.start
+#     ixmax = ixbox.stop-1
+#     iymin = iybox.start
+#     iymax = iybox.stop-1
+#     ixmin_new = ixbox_new.start
+#     ixmax_new = ixbox_new.stop-1
+#     iymin_new = iybox_new.start
+#     iymax_new = iybox_new.stop-1
+
+    # Inner boundary: diffusion and Neumann
+#     un[ixmin-1,iybox] = u0[ixmin-1,iybox] +(u0[ixmin-2,iybox] - u0[ixmin-1,iybox])*Deff -uneumann
+#     un[ixmax+1,iybox] = u0[ixmax+1,iybox] +(u0[ixmax+2,iybox] - u0[ixmax+1,iybox])*Deff -uneumann
+
+    un[ix43,iy43-1] = u0[ix43,iy43-1] +(u0[ix43,iy43-2] - u0[ix43,iy43-1])*Deff -uneumann
+    un[ix01,iy01+1] = u0[ix01,iy01+1] +(u0[ix01,iy01+2] - u0[ix01,iy01+1])*Deff -uneumann
+    un[ix12+1,iy12+1] = u0[ix12+1,iy12+1] +(u0[ix12+2,iy12+2] - u0[ix12+1,iy12+1])*Deff -uneumann
+    un[ix32+1,iy32-1] = u0[ix32+1,iy32-1] +(u0[ix32+2,iy32-2] - u0[ix32+1,iy32-1])*Deff -uneumann
+    un[ix54-1,iy54-1] = u0[ix54-1,iy54-1] +(u0[ix54-2,iy54-2] - u0[ix54-1,iy54-1])*Deff -uneumann
+    un[ix50-1,iy50+1] = u0[ix50-1,iy50+1] +(u0[ix50-2,iy50+2] - u0[ix50-1,iy50+1])*Deff -uneumann
+    
+#     un[ixboxnew_right,iymax_new+1] = u0[ixboxnew_right,iymax_new+1] +(u0[ixboxnew_right,iymax_new+2] - u0[ixboxnew_right,iymax_new+1])*Deff -uneumann
+#     un[ixbox,iymax_new+1] = u0[ixbox,iymax_new+1] +(u0[ixbox,iymax_new+2] - u0[ixbox,iymax_new+1])*Deff -uneumann
+        
+    return un
+
 def propagate_vaporfield_Euler_x1d(u0,udirichlet,uneumann,Deff):
     
     # Diffusion ... indices [1:-1] exclude the first and the last ...
