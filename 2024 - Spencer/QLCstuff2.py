@@ -48,18 +48,26 @@ def f1d_solve_ivp_dimensionless(t, y, scalar_params, sigmaI, j2_list):
     dNtot_dt += dy
 
     # NQLL    
-    dNQLL_dt = dNtot_dt - getDeltaNQLL(Ntot0,Nstar,Nbar,NQLL0)
+    dNQLL_dt = dNtot_dt - (NQLL0 - (Nbar - Nstar*np.sin(2*np.pi*Ntot0)))
     
     # Package for output
     return np.concatenate((dNQLL_dt, dNtot_dt))
 
-#Now takes just deltaX as input
+#Now takes deltax and D as input (not combined DoverdeltaX2)
 def run_f1d_dimensionless(\
            NQLL_init_1D,Ntot_init_1D,times,\
            Nbar, Nstar, sigma0, nu_kin_mlyperus, deltaX, D, tau_eq, sigmaI,\
            AssignQuantity,\
            verbose=0, odemethod='LSODA'):
+    """
+    Takes dimensional arrays for NQLL, Ntot, and time steps but not dimensional quantities for scalars
+    """
     
+    #convert to nondimensional?
+    times = times / tau_eq
+    Ntot_init_1D = Ntot_init_1D #/ np.sqrt(D * tau_eq)
+    NQLL_init_1D = NQLL_init_1D #/ np.sqrt(D * tau_eq)
+
     # Prep for the integration
     nt = len(times)
     nx = len(NQLL_init_1D)
@@ -138,8 +146,8 @@ def run_f1d_dimensionless(\
     NQLLkeep_1D = ykeep_1Darr_reshaped[:,0,:]
     
     #scale back to dimensionalized space
-    Ntotkeep_1D = Ntotkeep_1D * np.sqrt(D * tau_eq)
-    NQLLkeep_1D = NQLLkeep_1D * np.sqrt(D * tau_eq)
+    Ntotkeep_1D = Ntotkeep_1D #* np.sqrt(D * tau_eq)
+    NQLLkeep_1D = NQLLkeep_1D #* np.sqrt(D * tau_eq)
     
     return Ntotkeep_1D, NQLLkeep_1D
 
@@ -220,7 +228,7 @@ def report_1d_growth_results_dimensionless(\
 
 ######################### main for debugging ###########
 
-"""
+""" 
 inputfile = "./2024 - Spencer/GI parameters - Reference limit cycle (for testing).nml"
 
 # For readability ...
@@ -311,6 +319,7 @@ RT=f90nml.read(inputfile)['RT'] # Read the main parameter namelist
 
 # How long
 runtime = RT['runtime']
+runtime = 10
 runtime_units = RT['runtime_units']
 runtime = AssignQuantity(runtime,runtime_units)
 print('runtime =', runtime)
@@ -337,6 +346,7 @@ Ntotkeep_1D, NQLLkeep_1D = run_f1d_dimensionless(\
     sigma0.magnitude, 
     nu_kin_mlyperus.magnitude,
     deltax.magnitude,
+    D.magnitude,
     tau_eq.magnitude, 
     sigmaI_QLC,\
     AssignQuantity,\
@@ -358,4 +368,7 @@ title_params = \
         "\n"
     
 print(":)")
-"""
+
+g_ice_QLC = report_1d_growth_results_dimensionless(\
+        x_QLC,tkeep_1Darr,NQLLkeep_1D,Ntotkeep_1D,Nicekeep_1D,h_pr, \
+        graphics=True,title_params=title_params) """
