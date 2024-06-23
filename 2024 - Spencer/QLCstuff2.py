@@ -65,8 +65,7 @@ def run_f1d_dimensionless(\
     
     #convert to nondimensional?
     times = times / tau_eq
-    Ntot_init_1D = Ntot_init_1D #/ np.sqrt(D * tau_eq)
-    NQLL_init_1D = NQLL_init_1D #/ np.sqrt(D * tau_eq)
+    deltaX = deltaX / np.sqrt(D * tau_eq)
 
     # Prep for the integration
     nt = len(times)
