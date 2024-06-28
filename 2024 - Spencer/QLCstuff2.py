@@ -28,13 +28,13 @@ def getDeltaNQLL(Ntot,Nstar,Nbar,NQLL):
     return NQLL - (Nbar - Nstar*np.sin(2*np.pi*Ntot))
 
 def f1d_solve_ivp_dimensionless(t, y, scalar_params, sigmaI, j2_list):
-    Nbar, Nstar, sigma0, omega_kin, deltax = scalar_params
+    Nbar, Nstar, sigma0, omega_kin, deltax, D, t_0 = scalar_params
     l = int(len(y)/2)
     NQLL0 = y[:l]
     Ntot0 = y[l:]
 
     # Diffusion term based on FT
-    Dcoefficient1 = 4 / (deltax * l * np.pi)**2  #print('Dcoefficient1', Dcoefficient1)
+    Dcoefficient1 =   4 * np.pi**2 / (deltax * l)**2  #print('Dcoefficient1', Dcoefficient1)
     bj_list = rfft(NQLL0)
     cj_list = bj_list*j2_list
     dy = -Dcoefficient1  * irfft(cj_list)
@@ -64,11 +64,11 @@ def run_f1d_dimensionless(\
     """
     
     #convert to nondimensional?
-    times = times / tau_eq
-    deltaX = deltaX / np.sqrt(D * tau_eq)
+    times_nondim = times / tau_eq
+    deltaX_nondim = deltaX / (np.sqrt(D * tau_eq))
 
     # Prep for the integration
-    nt = len(times)
+    nt = len(times_nondim)
     nx = len(NQLL_init_1D)
     ylast = np.array([NQLL_init_1D,Ntot_init_1D])
     ylast = np.reshape(ylast,2*nx)
@@ -85,13 +85,13 @@ def run_f1d_dimensionless(\
 
     # Bundle params for ODE solver
     scalar_params = np.array(\
-        [Nbar, Nstar, sigma0, omega_kin, deltaX])
+        [Nbar, Nstar, sigma0, omega_kin, deltaX_nondim, D, tau_eq])
     
     # Loop over times
     for i in range(0,nt-1):
                 
         # Specify the time interval of this step
-        tinterval = [times[i].magnitude,times[i+1].magnitude]
+        tinterval = [times_nondim[i].magnitude,times_nondim[i+1].magnitude]
         
         if verbose > 0:
             print(tinterval)
