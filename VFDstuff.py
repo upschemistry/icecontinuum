@@ -688,3 +688,157 @@ def VF2DSquare(Temperature,Pressure,g_ice,sigmaI_far_field,Ldesired,\
   
     # Return
     return [xshifted, sigmaDx], [yshifted, sigmaDy], [x, y, un], [Lx, Ly]
+
+def removedups(mylist):
+    
+    # Removes duplicates in mylist, preserving the order
+    
+    seen = set()
+    no_dups = []
+    for lst in mylist.T:
+
+        # convert to hashable type
+        current = tuple(lst)
+
+        # If element not in seen, add it to both
+        if current not in seen:
+            no_dups.append(lst)
+            seen.add(current)
+        else:
+            print('not keeping', current)
+            
+    npts_unique, dummy = np.shape(no_dups); #print(npts_unique)
+    ixedges_unique = []
+    iyedges_unique = []
+
+    for i in range(npts_unique):
+        ixedges_unique.append(no_dups[i][0])
+        iyedges_unique.append(no_dups[i][1])
+
+    no_dups = np.vstack((ixedges_unique,iyedges_unique))
+
+    return no_dups, npts_unique
+
+def removedups2(mylist1,mylist2):
+    
+    # Removes any tuple in mylist1 that appears in mylist2
+    
+    seen = set()
+    for lst in mylist2.T:
+        current = tuple(lst)
+        seen.add(current)
+    
+    no_dups = []
+    for lst in mylist1.T:
+
+        # convert to hashable type
+        current = tuple(lst)
+
+        # If element not in seen, add it to both
+        if current not in seen:
+            no_dups.append(lst)
+        else:
+            print('not keeping', current)
+            
+    npts_unique, dummy = np.shape(no_dups); #print(npts_unique)
+    ixedges_unique = []
+    iyedges_unique = []
+
+    for i in range(npts_unique):
+        ixedges_unique.append(no_dups[i][0])
+        iyedges_unique.append(no_dups[i][1])
+
+    no_dups = np.vstack((ixedges_unique,iyedges_unique))
+
+    return no_dups, npts_unique
+
+
+def autoscale(ax=None, axis='y', margin=0.1):
+    '''Autoscales the x or y axis of a given matplotlib ax object
+    to fit the margins set by manually limits of the other axis,
+    with margins in fraction of the width of the plot
+
+    Defaults to current axes object if not specified.
+    '''
+    import matplotlib.pyplot as plt
+    import numpy as np
+    if ax is None:
+        ax = plt.gca()
+    newlow, newhigh = np.inf, -np.inf
+
+    for artist in ax.collections + ax.lines:
+        x,y = get_xy(artist)
+        if axis == 'y':
+            setlim = ax.set_ylim
+            lim = ax.get_xlim()
+            fixed, dependent = x, y
+        else:
+            setlim = ax.set_xlim
+            lim = ax.get_ylim()
+            fixed, dependent = y, x
+
+        low, high = calculate_new_limit(fixed, dependent, lim)
+        newlow = low if low < newlow else newlow
+        newhigh = high if high > newhigh else newhigh
+
+    margin = margin*(newhigh - newlow)
+
+    setlim(newlow-margin, newhigh+margin)
+
+def calculate_new_limit(fixed, dependent, limit):
+    '''Calculates the min/max of the dependent axis given 
+    a fixed axis with limits
+    '''
+    if len(fixed) > 2:
+        mask = (fixed>limit[0]) & (fixed < limit[1])
+        window = dependent[mask]
+        low, high = window.min(), window.max()
+    else:
+        low = dependent[0]
+        high = dependent[-1]
+        if low == 0.0 and high == 1.0:
+            # This is a axhline in the autoscale direction
+            low = np.inf
+            high = -np.inf
+    return low, high
+
+def get_xy(artist):
+    '''Gets the xy coordinates of a given artist
+    '''
+    if "Collection" in str(artist):
+        x, y = artist.get_offsets().T
+    elif "Line" in str(artist):
+        x, y = artist.get_xdata(), artist.get_ydata()
+    else:
+        raise ValueError("This type of object isn't implemented yet")
+    return x, y
+
+def Cartesian_position_to_index(x,L,dx):
+    index = np.rint((x+L)/dx).astype(int)
+    return(index)
+
+def Cartesian_index_to_position(index,L,dx):
+    position = index*dx - L
+    return(position)
+
+def Cartesian_propagate_hexagon(u0,udirichlet,uneumann,Deff,Dmatrix,iedges,npts_total):
+
+    # Propagates the vapor field forward one time step
+    
+    # Initialize starting values
+    un = np.zeros(np.shape(u0))
+
+    # Diffusion throughout (this is wrong)
+    un[1:-1, 1:-1] = u0[1:-1, 1:-1] + ( \
+    ( (u0[2:, 1:-1] - u0[1:-1, 1:-1])*Dmatrix[1:,1:] + (u0[0:-2, 1:-1] -u0[1:-1, 1:-1])*Dmatrix[0:-1,1:] ) + \
+    ( (u0[1:-1, 2:] - u0[1:-1, 1:-1])*Dmatrix[1:,1:] + (u0[1:-1, 0:-2] -u0[1:-1, 1:-1])*Dmatrix[1:,0:-1] ) )
+    
+    # Assigning Dirichlet conditions at the perimeter of the simulation box
+    un[[0,-1],:] = udirichlet
+    un[:,[0,-1]] = udirichlet
+    
+    # Assigning Neumann conditions above the crystal surface
+    for i in range(npts_total):
+        un[iedges[0,i],iedges[1,i]] -= uneumann
+            
+    return(un)
