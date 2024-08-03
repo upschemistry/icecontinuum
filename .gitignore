@@ -21,7 +21,8 @@ bloom_2022/L_vs_Nss.html
 2024 - Jones/*
 # except for:
 !2024 - Jones/animate_ice_PINN.py
-!2024 - Jones/looking_around.ipynb
 !2024 - Jones/Ice-PINN-Trainer.ipynb
+!2024 - Jones/looking_around.ipynb
+!2024 - Jones/reference_solution.ipynb
 !2024 - Jones/GI parameters - Reference limit cycle (for testing).nml
 !2024 - Jones/requirements.txt
