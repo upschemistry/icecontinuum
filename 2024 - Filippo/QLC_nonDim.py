@@ -1,23 +1,11 @@
 import numpy as np
-from copy import copy as cp
-import matplotlib.pylab as plt
 from scipy.integrate import solve_ivp
-from numba import njit, float64, int32, types
-from matplotlib import rcParams
 from time import time
-from scipy.fft import fft, ifft, rfft, irfft, fftfreq
-from scipy.interpolate import CubicSpline
+from scipy.fft import rfft, irfft
 from pint import UnitRegistry; AssignQuantity = UnitRegistry().Quantity
 
-import sys
 import f90nml
 
-ticklabelsize = 15
-linewidth = 1
-fontsize = 15
-titlefontsize = 8
-color = 'k'
-markersize = 10
 
 def generate_reference_solution(inputfile = "GI parameters.nml", runtime = 50, num_steps = 50, verbose = False):
     """ 
@@ -162,13 +150,8 @@ def generate_reference_solution(inputfile = "GI parameters.nml", runtime = 50, n
     
     return val
 
-@njit
 def getNQLL(Ntot,Nstar,Nbar):
     return Nbar - Nstar*np.sin(2*np.pi*Ntot)
-
-@njit
-def getDeltaNQLL(Ntot,Nstar,Nbar,NQLL):
-    return NQLL - (Nbar - Nstar*np.sin(2*np.pi*Ntot))
 
 def f1d_solve_ivp_dimensionless(t, y, scalar_params, sigmaI, j2_list):
     Nbar, Nstar, sigma0, omega_kin, deltax, D, t_0 = scalar_params
