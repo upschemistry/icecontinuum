@@ -20,10 +20,12 @@ GI=f90nml.read(inputfile)['GI']
 nx_crystal = GI['nx_crystal']
 L = GI['L']
 tau_eq = GI['tau_eq']
-x_QLC = np.linspace(-L,L,nx_crystal)
+
+# Generate evenly spaced x values
+X_QLC = np.linspace(-L,L,nx_crystal)
 
 
-def generate_reference_solution(runtime = 50, num_steps = 50, verbose = False):
+def generate_reference_solution(runtime = 50, num_steps = 51, verbose = False):
     """ 
     Generates a reference solution for the QLC problem using a non-dimensional model.
 
@@ -106,12 +108,11 @@ def generate_reference_solution(runtime = 50, num_steps = 50, verbose = False):
     c_r.ito('dimensionless')
     tau_eq.ito('microsecond')
     
-    # Create evenly-spaced x values
-    x_QLC = np.linspace(-L,L,nx_crystal)
-    deltax = (x_QLC[1]-x_QLC[0])
+    # Calculate deltaX
+    deltax = (X_QLC[1]-X_QLC[0])
 
     # Compute sigmaI_QLC and nu_kin_mlyperus
-    sigmaI_QLC = sigmaI_corner*(c_r*(x_QLC/L)**2+1-c_r)
+    sigmaI_QLC = sigmaI_corner*(c_r*(X_QLC/L)**2+1-c_r)
     nu_kin_mlyperus = nu_kin/h_pr
     nu_kin_mlyperus.ito('1/microsecond')
 
@@ -167,21 +168,37 @@ def generate_reference_solution(runtime = 50, num_steps = 50, verbose = False):
     
     return val
 
-def plot_together(list1, list2, xlist, label1 = "", label2 = ""):
+
+def plot_reference_vs_network(reference_solution, network_solution):
+    """
+    Plots reference solution against PINN solution for Ntot, Nqll, and N-ice.
+    reference_solution and network_solution must be of the same shape.
+    """
+    labels = ["Ntot", "Nqll", "N-ice"]
+    for i in range(len(labels)):
+        plot_together(reference_solution[i][-1], network_solution[i][-1], X_QLC, labels[i])
+
+
+def plot_together(expected_list, predicted_list, xlist, label = ""):
+    """
+    Plots expected output against predicted output.
+    """
     plt.figure()
-    plt.plot(xlist,list1,label=label1)
-    plt.plot(xlist,list2,label=label2)
+    plt.plot(xlist,expected_list,label="Expected "+label)
+    plt.plot(xlist,predicted_list,label="Predicted "+label)
+    plt.title(label="Expected vs Predicted "+label)
     plt.xlabel('x (micrometers)')
+    plt.ylabel('Number of Ice Layers')
     plt.grid(True)
     plt.legend()
 
     plt.figure()
-    plt.plot(xlist,(list1 - list2),label='Error')
+    plt.plot(xlist,(expected_list - predicted_list),label=label+" Error")
     plt.xlabel('x (micrometers)')
+    plt.ylabel('Deviation (# ice layers)')
     plt.grid(True)
     plt.legend()
 
-    return (list1 - list2)
 
 def plot_alone(ylist, xlist, label = ""):
     plt.figure()
