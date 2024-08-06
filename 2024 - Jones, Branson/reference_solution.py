@@ -82,11 +82,6 @@ def generate_reference_solution(runtime = 50, num_steps = 51, verbose = False):
     nu_kin_units = GI['nu_kin_units']
     nu_kin = AssignQuantity(nu_kin,nu_kin_units)
 
-    # Size of the facet
-    L = GI['L']
-    L_units = GI['L_units']
-    L = AssignQuantity(L,L_units)
-
     # Crystal size -- needs to be an even number
     nx_crystal = GI['nx_crystal']
 
@@ -103,7 +98,6 @@ def generate_reference_solution(runtime = 50, num_steps = 51, verbose = False):
     h_pr.ito('micrometer')
     D.ito('micrometer^2/microsecond')
     nu_kin.ito('micrometer/second')
-    L.ito('micrometer')
     sigmaI_corner.ito('dimensionless')
     c_r.ito('dimensionless')
     tau_eq.ito('microsecond')
@@ -154,7 +148,7 @@ def generate_reference_solution(runtime = 50, num_steps = 51, verbose = False):
         Nstar, 
         sigma0.magnitude, 
         nu_kin_mlyperus.magnitude,
-        deltax.magnitude,
+        deltax,
         D.magnitude,
         tau_eq.magnitude, 
         sigmaI_QLC,\
