@@ -20,6 +20,7 @@ bloom_2022/L_vs_Nss.html
 # Ignore all in '2024 - Jones' directory
 2024 - Jones, Branson/*
 # except for:
+!2024 - Jones, Branson/animate_ice_PINN.ipynb
 !2024 - Jones, Branson/animate_ice_PINN.py
 !2024 - Jones, Branson/Ice-PINN-Trainer.ipynb
 !2024 - Jones, Branson/looking_around.ipynb
