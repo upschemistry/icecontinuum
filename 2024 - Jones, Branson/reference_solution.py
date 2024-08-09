@@ -190,6 +190,7 @@ def plot_together(expected_list, predicted_list, xlist, label = ""):
     plt.plot(xlist,(expected_list - predicted_list),label=label+" Error")
     plt.xlabel('x (micrometers)')
     plt.ylabel('Deviation (# ice layers)')
+    plt.title("Difference between Expected and Predicted "+label)
     plt.grid(True)
     plt.legend()
 
