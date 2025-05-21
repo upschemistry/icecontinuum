@@ -37,7 +37,7 @@ def VF2d_x1d(Temperature,Pressure,g_ice,sigmaI_far_field,L,\
     tmax = AssignQuantity(tmax_mag,'microsecond')
 
     # Box size
-    xmax = AssignQuantity(cmax_mag,'micrometer')
+    xmax = AssignQuantity(xmax_mag,'micrometer')
     x = np.linspace(L,xmax,nx); dx = x[1]-x[0]
     dx2 = dx**2
 
