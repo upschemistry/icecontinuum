@@ -50,13 +50,13 @@ def VF2d_x1d(Temperature,Pressure,g_ice,sigmaI_far_field,L,\
         dt = dx2/D/30
 
     # Computing effective diffusion coefficents (without dt)
-    Deff = D/dr2
+    Deff = D/dx2
     
     # Calculating the Neumann condition at the vapor/ice boundary (starting with ice density)
     rho_ice = AssignQuantity(0.9,'g/cm^3')
     Mvap = AssignQuantity(18,'g/mol')
     R = AssignQuantity(8.314,'J/mol/kelvin')
-    uneumann = rho_ice*g_ice*R*Temperature/(Mvap*dr); uneumann.ito('pascal/microsecond')
+    uneumann = rho_ice*g_ice*R*Temperature/(Mvap*dx); uneumann.ito('pascal/microsecond')
     if verbose>0:
         print('uneumann = ',uneumann)
     
