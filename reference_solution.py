@@ -25,7 +25,7 @@ tau_eq = GI['tau_eq']
 X_QLC = np.linspace(-L,L,nx_crystal)
 
 
-def generate_reference_solution(runtime = 50, num_steps = 51, verbose = False):
+def generate_reference_solution(runtime = 50, num_steps = 51, verbose = True):
     """ 
     Generates a reference solution for the QLC problem using a non-dimensional model.
 
