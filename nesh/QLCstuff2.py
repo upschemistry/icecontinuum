@@ -352,11 +352,11 @@ def f1d_sigma_m(y, t, params):
     return sigma_m
 
 @njit
-def getsigmaI(x,xmax,center_reduction,sigmaIcorner,method='sinusoid'):
+def getsigmaI(x,xmax,center_reduction,sigmaIcorner,method='sinusoid',nsinusoid=1):
     sigmapfac = 1-center_reduction/100
     xmid = max(x)/2
     if method == 'sinusoid':
-        fsig = (np.cos(x/xmax*np.pi*2)+1)/2*(1-sigmapfac)+sigmapfac
+        fsig = (np.cos(x/xmax*np.pi*2*nsinusoid)+1)/2*(1-sigmapfac)+sigmapfac
     elif method == 'parabolic':
         fsig = (x-xmid)**2/xmid**2*(1-sigmapfac)+sigmapfac
     else:
