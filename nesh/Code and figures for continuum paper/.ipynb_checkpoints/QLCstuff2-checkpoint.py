@@ -1,7 +1,7 @@
 import numpy as np
 from copy import copy as cp
 import matplotlib.pylab as plt
-from numba import njit, float64, int32, types
+# from numba import njit, float64, int32, types
 from matplotlib import rcParams
 from time import time
 from scipy.fft import fft, ifft, rfft, irfft, fftfreq
@@ -10,7 +10,6 @@ from scipy.integrate import solve_ivp
 from pint import UnitRegistry; AssignQuantity = UnitRegistry().Quantity
 
 # import copy
-from numba import njit, float64, int32, types
 
 
 import sys
@@ -88,7 +87,7 @@ def get_cr_of_TP(L,Temperature,Pressure,AssignQuantity):
     cr_of_TP = L/L_cr_of_TP
     return cr_of_TP
 
-@njit
+# @njit
 def getNQLL(Ntot,Nstar,Nbar):
     return Nbar - Nstar*np.sin(2*np.pi*Ntot)
 
@@ -96,7 +95,7 @@ def getNQLL(Ntot,Nstar,Nbar):
 # def getDeltaNQLL(Ntot,Nstar,Nbar,NQLL):
 #     return NQLL - (Nbar - Nstar*np.sin(2*np.pi*Ntot))
 
-@njit
+# @njit
 def getDeltaNQLL(Ntot,Nstar,Nbar,NQLL):
     return NQLL-getNQLL(Ntot,Nstar,Nbar)
 
@@ -126,7 +125,7 @@ def f1d_solve_ivp_dimensionless(t, y, scalar_params, sigmaI, j2_list):
     # Package for output
     return np.concatenate((dNQLL_dt, dNtot_dt))
 
-@njit("f8[:](f8,f8[:],f8[:],f8[:])")
+# @njit("f8[:](f8,f8[:],f8[:],f8[:])")
 def f1d_solve_ivp(t, y, scalar_params, sigmaI):
     Nbar, Nstar, sigma0, nu_kin_mlyperus, DoverdeltaX2, tau_eq = scalar_params
     l = int(len(y)/2)
@@ -341,7 +340,7 @@ def getsigma_m(NQLL0,Nbar,Nstar,sigmaI,sigma0):
     sigma_m = (sigmaI - m * sigma0)
     return sigma_m
 
-@njit
+# @njit
 def f1d_sigma_m(y, t, params):
     Nbar, Nstar, sigmaI, sigma0, nu_kin_mlyperus, Doverdeltax2, nx = params
     NQLL0, Ntot0 = np.reshape(y,(2,nx))      # unpack current values of y
@@ -351,19 +350,25 @@ def f1d_sigma_m(y, t, params):
     sigma_m = (sigmaI - m * sigma0)
     return sigma_m
 
-@njit
+# @njit
 def getsigmaI(x,xmax,center_reduction,sigmaIcorner,method='sinusoid',nsinusoid=1):
     sigmapfac = 1-center_reduction/100
     xmid = max(x)/2
     if method == 'sinusoid':
         fsig = (np.cos(x/xmax*np.pi*2*nsinusoid)+1)/2*(1-sigmapfac)+sigmapfac
+        fsig *= sigmaIcorner
     elif method == 'parabolic':
         fsig = (x-xmid)**2/xmid**2*(1-sigmapfac)+sigmapfac
+        fsig *= sigmaIcorner
+    elif method == 'random':
+        fsig = (x-xmid)**2/xmid**2*(1-sigmapfac)+sigmapfac
+        fsig *= sigmaIcorner
+        fsig += np.random.normal(0,sigmaIcorner/20000,np.shape(x))
     else:
         print('bad method')
-    return fsig*sigmaIcorner
+    return fsig
     
-@njit
+# @njit
 def f0d_solve_ivp(t, y, myparams):
     Nbar, Nstar, sigmaI, sigma0, nu_kin_mlyperus, tau_eq = myparams  # unpack parameters
     NQLL0 = y[0]
