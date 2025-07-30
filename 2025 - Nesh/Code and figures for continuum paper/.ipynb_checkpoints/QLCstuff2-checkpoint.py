@@ -41,6 +41,31 @@ def get_nu_kin(T,AssignQuantity):
     nu_kin.ito('micrometer/second')
     return(nu_kin)
 
+# def get_nu_kin(T,AssignQuantity):
+#     rho = AssignQuantity(0.9,'g/cm^3')
+#     M = AssignQuantity(18,'g/mol')
+#     R = AssignQuantity(8.314,'J/mol/K')
+    
+#     # Clausius-Clapeyron
+#     P_vapor_eq = Clausius_Clapeyron(T,AssignQuantity)
+    
+#     # Hertz-Knudsen
+#     nu_kin = P_vapor_eq*M**.5/(2*np.pi*R*T)**.5
+#     nu_kin.ito('gram / micrometer ** 2 / second')
+#     nu_kin /= rho
+#     nu_kin.ito('micrometer/second')
+#     return(nu_kin)
+
+# def Clausius_Clapeyron(T,AssignQuantity):
+#     P3 = AssignQuantity(611,'Pa')
+#     T3 = AssignQuantity(273,'K')
+#     Delta_H_sub = AssignQuantity(50,'kJ/mol')
+#     R = AssignQuantity(8.314,'J/mol/K')
+#     P_vapor_eq = P3*np.exp(-Delta_H_sub/R*(1/T-1/T3))
+#     return P_vapor_eq
+
+
+
 def get_D_of_T(T,AssignQuantity):
     """ Based on a log/inverse T fit to Price's data for supercooled liquid water """
     T_inverse_Temperature = 1e3/T; #print(T_inverse_Temperature)
@@ -159,6 +184,81 @@ def f1d_solve_ivp(t, y, scalar_params, sigmaI):
 
     return derivs
 
+# These are vaporfield functions
+# ----------
+def getDvapofT(T):
+    """ This produces D in micrometers^2/microsecond """
+    """ Assumes temperature in degrees K """
+
+    m = 1.86121271
+    b = -7.35421981
+    logD = m*np.log(T.magnitude)+b
+    D = np.exp(logD)
+    D = AssignQuantity(D,'micrometers^2/microsecond')
+    return D
+
+def getDvapofTpow(T,AssignQuantity):
+    """ This produces D in micrometers^2/microsecond """
+    """ Assumes temperature in degrees K """
+
+    m = 1.86121271
+    b = -7.35421981
+    T0 = 273
+    D0 = np.exp(b)*T0**m; print('D0 = ', D0)
+    D = (T.magnitude/T0)**m * D0
+    D = AssignQuantity(D,'micrometers^2/microsecond')
+    return D
+
+def getDvapofTP(T,P,AssignQuantity):
+    DofT = getDvapofTpow(T,AssignQuantity); # print(DofT)
+    P0 = AssignQuantity(1,'atm') 
+    D = DofT/(P.to('atm')/P0)
+    return D
+
+def propagatevap(u0,ixbox,iybox,udirichlet,uneumannx,uneumanny,Dxeff,Dyeff):
+    
+    # Diffusion
+    un = np.empty(np.shape(u0))
+    un[1:-1, 1:-1] = u0[1:-1, 1:-1] + ( \
+    (u0[2:, 1:-1] - 2*u0[1:-1, 1:-1] + u0[:-2, 1:-1])*Dxeff + \
+    (u0[1:-1, 2:] - 2*u0[1:-1, 1:-1] + u0[1:-1, :-2])*Dyeff )
+
+    # Dirichlet outer boundary
+    un[[0,-1],:]=udirichlet
+    un[:,[0,-1]]=udirichlet
+        
+    # Pull out the stop and start indices
+    ixmin = ixbox.start
+    ixmax = ixbox.stop-1
+    iymin = iybox.start
+    iymax = iybox.stop-1
+
+    # Inner boundary: diffusion and Neumann
+    un[ixmin-1,iybox] = u0[ixmin-1,iybox] +(u0[ixmin-2,iybox] - u0[ixmin-1,iybox])*Dxeff -uneumannx
+    un[ixmax+1,iybox] = u0[ixmax+1,iybox] +(u0[ixmax+2,iybox] - u0[ixmax+1,iybox])*Dxeff -uneumannx
+
+    un[ixbox,iymin-1] = u0[ixbox,iymin-1] +(u0[ixbox,iymin-2] - u0[ixbox,iymin-1])*Dyeff -uneumanny
+    un[ixbox,iymax+1] = u0[ixbox,iymax+1] +(u0[ixbox,iymax+2] - u0[ixbox,iymax+1])*Dyeff -uneumanny
+        
+    return un
+
+def Clausius_Clapeyronvap(T,AssignQuantity):
+    P3 = AssignQuantity(611,'Pa')
+    T3 = AssignQuantity(273,'K')
+    Delta_H_sub = AssignQuantity(50,'kJ/mol')
+    R = AssignQuantity(8.314,'J/mol/K')
+    P_vapor_eq = P3*np.exp(-Delta_H_sub/R*(1/T-1/T3))
+    return P_vapor_eq
+
+def fillin(un,ixbox,iybox,overrideflag=0,overrideval=0):
+    border = cp(un[ixbox.start-1,iybox.start])
+    if(overrideflag == 1):
+        border = overrideval
+    un[ixbox,iybox] = border
+    return un
+
+
+# ----------
     
 #Now takes deltax and D as input (not combined DoverdeltaX2)
 def run_f1d_dimensionless(\
