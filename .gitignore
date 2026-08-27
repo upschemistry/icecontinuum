@@ -1,30 +1,4 @@
 *.pyc
 *-checkpoint.ipynb
 .DS_Store
-bloom_2022/c_r_vs_sigma.html
-bloom_2022/D_vs_sigma.html
-bloom_2022/Nss_vs_sigma.html
-bloom_2022/L_vs_sigma_13pts.html
-bloom_2022/L_vs_sigma.html
-bloom_2022/nu_kin_vs_sigma.html
-bloom_2022/__pycache__/**
-bloom_2022/data/**
-bloom_2022/images/**
-bloom_2022/videos/**
-bloom_2022/c_r_vs_sigma_3-10-2023.html
-bloom_2022/D_vs_sigma_3-10-2023.html
-bloom_2022/Nss_vs_nu_kin_3-10-2023.html
-bloom_2022/Nss_vs_sigma_with_subsat.html
-bloom_2022/L_vs_Nss.html
-
-# Ignore all in '2024 - Jones' directory
-2024 - Jones, Branson/*
-# except for:
-!2024 - Jones, Branson/animate_ice_PINN.ipynb
-!2024 - Jones, Branson/animate_ice_PINN.py
-!2024 - Jones, Branson/Ice-PINN-Trainer.ipynb
-!2024 - Jones, Branson/looking_around.ipynb
-!2024 - Jones, Branson/reference_solution.ipynb
-!2024 - Jones, Branson/reference_solution.py
-!2024 - Jones, Branson/GI parameters - Reference limit cycle (for testing).nml
-!2024 - Jones, Branson/requirements.txt
+__pycache__
