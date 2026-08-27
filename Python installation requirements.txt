@@ -1,6 +1,0 @@
-numba
-numpy
-matplotlib
-plotly
-scipy
-f90nml
