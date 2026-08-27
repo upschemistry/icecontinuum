@@ -1,0 +1,1 @@
+This repository contains Python code for solving the QLC-2 equations of motion for the dynamics of ice surfaces containing a quasi-liquid layer. The folder "sample code" contains two jupyter notebooks (.ipynb files) that run simulations. There is also a .gif file in that folder that shows an animation of a solution.
