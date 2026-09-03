@@ -8,6 +8,7 @@ from time import time
 from scipy.fft import fft, ifft, rfft, irfft, fftfreq
 from scipy.interpolate import CubicSpline
 myinterpolator = CubicSpline
+import f90nml
 
 ticklabelsize = 15
 linewidth = 1
@@ -28,7 +29,7 @@ def getsigmaI(x,xmax,center_reduction,sigmaIcorner,method='sinusoid'):
         print('bad method')
     return fsig*sigmaIcorner
 
-def get_nu_kin(T,AssignQuantity):
+def get_nu_kin_orig(T,AssignQuantity):
     """ Hertz-Knudsen deposition velocity """
 
     # Reference values
@@ -50,6 +51,11 @@ def get_nu_kin(T,AssignQuantity):
     nu_kin.ito('micrometer/second')
     return(nu_kin)
 
+def get_nu_kin(T,h_layer,AssignQuantity):
+    nu_kin = get_nu_kin_orig(T,AssignQuantity)/h_layer
+    nu_kin.ito('1/microsecond')
+    return(nu_kin)
+
 #@njit
 def get_alpha(beta,beta_trans,delta_beta):
     alpha = 1-1/(1+np.exp(-(beta-beta_trans)/delta_beta))
@@ -63,206 +69,7 @@ def getNQLL(Ntot,Nstar,Nbar):
 def getDeltaNQLL(Ntot,Nstar,Nbar,NQLL):
     return NQLL - (Nbar - Nstar*np.sin(2*np.pi*Ntot))
 
-#@njit
-def pypr_getDeltaNQLL(Ntot_pr,Ntot_pyneg,Ntot_pypos,alpha_pr,alpha_pyneg,alpha_pypos,Nstar_pr,Nstar_py,Nbar,NQLL_pr):
-    NQLL_eq_pr    = Nbar - Nstar_pr*np.sin(2*np.pi*Ntot_pr)
-    NQLL_eq_pyneg = Nbar - Nstar_py*np.sin(2*np.pi*Ntot_pyneg)
-    NQLL_eq_pypos = Nbar - Nstar_py*np.sin(2*np.pi*Ntot_pypos)
-    NQLL_eq = alpha_pr*NQLL_eq_pr + alpha_pyneg*NQLL_eq_pyneg + alpha_pypos*NQLL_eq_pypos
-    return NQLL_pr - NQLL_eq
 
-def pypr_solve_ivp(t, y, scalar_params, sigmaI, j_list, j2_list, x_QLC):
-    Nbar, Nstar_pr, Nstar_py, sigma0_pr, sigma0_py, nu_kin_mlyperus, DoverdeltaX2, tau_eq, \
-    theta, beta_trans, delta_beta, \
-    h_pr, h_py, microfacets = scalar_params
-    l = int(len(y)/2)
-    NQLL0 = NQLL_pr = y[:l]
-    Ntot0 = Ntot_pr = y[l:]
-    
-    # Using numpy's gradient method to get the first derivative of (scaled) Ntot
-    z_pr = h_pr * Ntot_pr
-    dx = x_QLC[1]-x_QLC[0]
-    beta = np.gradient(z_pr,dx)
-    
-    # Deposition from air
-    if microfacets == 1.0:
-        # Calculating the weights
-        alpha_pyneg = get_alpha(beta,-beta_trans,delta_beta)
-        alpha_pypos = 1-get_alpha(beta, beta_trans,delta_beta)
-        alpha_pr = 1 - alpha_pyneg - alpha_pypos
- 
-        # Ntot deposition
-        m_pr = (NQLL0 -(Nbar-Nstar_pr))/(2*Nstar_pr)
-        sigma_m_pr = (sigmaI - m_pr * sigma0_pr)    
-        m_py = (NQLL0 -(Nbar-Nstar_py))/(2*Nstar_py); 
-        sigma_m_py = (sigmaI - m_py * sigma0_py)
-        sigma_m = alpha_pyneg*sigma_m_py + alpha_pypos*sigma_m_py + alpha_pr*sigma_m_pr  
-    else:
-        m_pr = (NQLL0 -(Nbar-Nstar_pr))/(2*Nstar_pr)
-        sigma_m = (sigmaI - m_pr * sigma0_pr) 
-    dNtot_dt = nu_kin_mlyperus * sigma_m
-
-    # Add in surface diffusion (based on FT)
-    angles = np.arctan(beta) # Default is radians
-    costerm = np.cos(angles)
-    Dcoefficient1 = 4*DoverdeltaX2/l**2*np.pi**2 *costerm**2
-    bj_list = rfft(NQLL0)
-    cj_list = bj_list*j2_list
-    dy = -Dcoefficient1  * irfft(cj_list)
-    dNtot_dt += dy
-
-    # NQLL
-    if microfacets == 1.0:
-        Ntot_pyneg = 1/h_py * (np.cos(theta)*h_pr* Ntot_pr -np.sin(theta)*x_QLC)
-        Ntot_pypos = 1/h_py * (np.cos(theta)*h_pr* Ntot_pr +np.sin(theta)*x_QLC)
-        dNQLL_dt = dNtot_dt - pypr_getDeltaNQLL(\
-            Ntot_pr,Ntot_pyneg,Ntot_pypos,alpha_pr,alpha_pyneg,alpha_pypos,Nstar_pr,Nstar_py,Nbar,NQLL_pr)\
-            /tau_eq
-    else:
-        dNQLL_dt = dNtot_dt - getDeltaNQLL(Ntot0,Nstar_pr,Nbar,NQLL0)/tau_eq
-    
-    # Package for output
-    return np.concatenate((dNQLL_dt, dNtot_dt))
-
-
-def smoothout(x_QLC,Ntot_pr,deltax,d2Ntot_dx2_threshold,verbose=0):
-    dNtot_dx = np.gradient(Ntot_pr,deltax)#; print(dNtot_dx.units)
-    d2Ntot_dx2 = np.gradient(dNtot_dx,deltax)#; print(d2Ntot_dx2.units)
-    ismoothlist = np.argwhere(d2Ntot_dx2<-d2Ntot_dx2_threshold)
-    ismoothlist = ismoothlist.reshape(-1)
-    if verbose > 0:
-        print('Shape of the smooth list is ', ismoothlist.shape)
-    Ntot_pr_smoothed = np.copy(Ntot_pr)
-    nbefore = 2; #print(nbefore)
-    nafter = nbefore+1; #print(nafter)
-    nx = len(x_QLC)
-
-    for ismooth in ismoothlist:
-        if ismooth >= nbefore and ismooth <= nx-nafter:
-            x = x_QLC[ismooth-nbefore:ismooth+nafter]; #print("here is x", x)
-            x = np.delete(x,nbefore); #print("here is x", x)
-            y = Ntot_pr[ismooth-nbefore:ismooth+nafter]; #print("here is y",y)
-            y = np.delete(y,nbefore); #print("here is y", y)
-            spl = myinterpolator(x,y)
-            ynew = spl(x[nbefore]) # same as spl(x_QLC[ismooth])
-            Ntot_pr_smoothed[ismooth] = ynew
-
-        elif ismooth == nx-2:
-            if verbose > 0:
-                print('Linear smoothing at the end of the array')
-            Ntot_pr_smoothed[ismooth] = (Ntot_pr[-3]+Ntot_pr[-1])/2
-
-        elif ismooth == 1:
-            if verbose > 0:
-                print('Linear smoothing at the beginning of the array')
-            Ntot_pr_smoothed[ismooth] = (Ntot_pr[0]+Ntot_pr[2])/2
-                 
-    return d2Ntot_dx2, Ntot_pr_smoothed
-
-def run_pypr(\
-           NQLL_init_1D,Ntot_init_1D,times,\
-           Nbar, Nstar, sigma0, nu_kin_mlyperus, Doverdeltax2, tau_eq, \
-           theta, beta_trans_factor, Nstarfactor, h_pr, h_pyfactor, sigma0factor,\
-           sigmaI, x_QLC, d2Ntot_dx2_threshold,\
-           AssignQuantity,\
-           verbose=0, odemethod='RK45', microfacets=0):
-
-    """ Solves the QLC-2 problem with pyramidal as well as prismatic facet possibilities. """
-
-    # Prep for the integration
-    nt = len(times)
-    nx = len(NQLL_init_1D)
-    ylast = np.array([NQLL_init_1D,Ntot_init_1D])
-    ylast = np.reshape(ylast,2*nx)
-    ykeep_1D = [ylast]
-    lastprogress = 0
-    sigmaI_mag = sigmaI.magnitude
-    x_QLC_mag = x_QLC.magnitude
-    t1 = time()
-    bj_list = rfft(NQLL_init_1D)
-    j_list = np.array([j for j in range(len(bj_list))])
-    j2_list = np.array(j_list)**2
-    
-    # Integration prep having to do with multiple microfacets
-    theta.ito('radian')
-    beta_trans = np.sin(theta/2)/np.cos(theta/2)
-    delta_beta = beta_trans/beta_trans_factor
-    h_pr.ito('micrometer')
-    h_py = h_pr*h_pyfactor
-    Nstar_pr = Nstar
-    Nstar_py = Nstar_pr*Nstarfactor
-    sigma0_pr = sigma0.magnitude
-    sigma0_py = sigma0.magnitude*sigma0factor
-    
-    # This is prep for attempting to smooth Ntot
-    deltax_mag = x_QLC_mag[1]-x_QLC_mag[0]
-    d2Ntot_dx2_threshold_mag = d2Ntot_dx2_threshold.magnitude
-
-    # Bundle parameters for ODE solver
-    scalar_params = np.array(\
-      [Nbar, Nstar_pr, Nstar_py, sigma0_pr, sigma0_py, nu_kin_mlyperus.magnitude, Doverdeltax2.magnitude, tau_eq.magnitude, \
-       theta.magnitude, beta_trans.magnitude, delta_beta.magnitude,
-       h_pr.magnitude, h_py.magnitude, microfacets])
-
-    # Loop over times
-    for i in range(0,nt-1):
-                
-        # Specify the time interval of this step
-        tinterval = [times[i].magnitude,times[i+1].magnitude]
-        
-        # Integrate up to next time step
-        sol = solve_ivp(\
-            pypr_solve_ivp, tinterval, ylast, args=(scalar_params, sigmaI_mag, j_list, j2_list, x_QLC_mag), \
-            rtol=1e-12, method=odemethod) 
-        ylast = sol.y[:,-1]
-        
-        # Symmetrizing
-        ylast = np.array(ylast, dtype=np.complex128)
-        ylast_reshaped = np.reshape(ylast,(2,nx))
-        NQLL_last = ylast_reshaped[0,:]
-        Ntot_last = ylast_reshaped[1,:]
-        nx_mid = int(nx/2)
-        for j in range(0,nx_mid):
-            jp = nx -j -1
-            Ntot_last[j] = Ntot_last[jp]
-            NQLL_last[j] = NQLL_last[jp]
-        ylast = np.array([NQLL_last,Ntot_last])
-        ylast = np.reshape(ylast,2*nx)
-        ylast = np.real(ylast)
-
-        # Smoothing
-        ylast_1Darray = np.array(ylast, np.float64); 
-        ylast_1Darray_reshaped = np.reshape(ylast_1Darray,(2,nx))
-        Ntot_pr = ylast_1Darray_reshaped[1,:]; #print('Ntot_pr has shape', np.shape(Ntot_pr))
-        NQLL_pr = ylast_1Darray_reshaped[0,:]; #print('NQLL_pr has shape', np.shape(NQLL_pr))
-        d2Ntot_dx2, Ntot_pr_smoothed = smoothout(x_QLC_mag,Ntot_pr,deltax_mag,d2Ntot_dx2_threshold_mag,verbose)
-        ylast = np.array([NQLL_pr,Ntot_pr_smoothed])
-        ylast = np.reshape(ylast,2*nx)
-
-        # Stuff into keeper arrays
-        ykeep_1D.append(ylast)
-        
-        # Progress reporting
-        progress = int(i/nt*100)
-        if np.mod(progress,10) == 0:
-            if progress > lastprogress:
-                t2 = time()
-                elapsed = (t2 - t1)/60
-                print(progress,'%'+' elapsed time is %.3f minutes' %elapsed)
-                lastprogress = progress
-
-    print('100% done')
-    print('status = ', sol.status)
-    print('message = ', sol.message)
-    print(dir(sol))
-    
-    ykeep_1D = np.array(ykeep_1D, np.float64)
-    ykeep_1Darr = np.array(ykeep_1D, np.float64)
-    ykeep_1Darr_reshaped = np.reshape(ykeep_1Darr,(nt,2,nx))
-    Ntotkeep_1D = ykeep_1Darr_reshaped[:,1,:]
-    NQLLkeep_1D = ykeep_1Darr_reshaped[:,0,:]
-    
-    return Ntotkeep_1D, NQLLkeep_1D
 
 # #@njit("f8[:](f8,f8[:],f8[:],f8[:])")
 def f1d_solve_ivp(t, y, scalar_params, sigmaI, j2_list):
@@ -277,19 +84,20 @@ def f1d_solve_ivp(t, y, scalar_params, sigmaI, j2_list):
     dNtot_dt = nu_kin_mlyperus * sigma_m
 
     # Ntot diffusion in x-space (replaced by the FT code below this)
-#     dy = np.empty(np.shape(NQLL0))
-#     for i in range(1,len(NQLL0)-1):
-#         dy[i] = DoverdeltaX2*(NQLL0[i-1]-2*NQLL0[i]+NQLL0[i+1])
-#     dy[0]  = DoverdeltaX2*(NQLL0[-1] -2*NQLL0[0] +NQLL0[1]) # Periodic BC
-#     dy[-1] = DoverdeltaX2*(NQLL0[-2] -2*NQLL0[-1]+NQLL0[0])
+    dy = np.empty(np.shape(NQLL0))
+    for i in range(1,len(NQLL0)-1):
+        dy[i] = DoverdeltaX2*(NQLL0[i-1]-2*NQLL0[i]+NQLL0[i+1])
+    dy[0]  = DoverdeltaX2*(NQLL0[-1] -2*NQLL0[0] +NQLL0[1]) # Periodic BC
+    dy[-1] = DoverdeltaX2*(NQLL0[-2] -2*NQLL0[-1]+NQLL0[0])
 
     # Diffusion term based on FT
-    Dcoefficient1 = 4*DoverdeltaX2/l**2*np.pi**2; #print('Dcoefficient1', Dcoefficient1)
-    bj_list = rfft(NQLL0)
-    cj_list = bj_list*j2_list
-    dy = -Dcoefficient1  * irfft(cj_list)
+    # Dcoefficient1 = 4*DoverdeltaX2/l**2*np.pi**2; #print('Dcoefficient1', Dcoefficient1)
+    # bj_list = rfft(NQLL0)
+    # cj_list = bj_list*j2_list
+    # dy = -Dcoefficient1  * irfft(cj_list)
 
     # Combined
+    # print('from f1d_solve_ivp: shapes are ', np.shape(dNtot_dt), np.shape(dy))
     dNtot_dt += dy
 
     # NQLL    
@@ -302,7 +110,7 @@ def run_f1d(\
            NQLL_init_1D,Ntot_init_1D,times,\
            Nbar, Nstar, sigma0, nu_kin_mlyperus, Doverdeltax2, tau_eq, sigmaI,\
            AssignQuantity,\
-           verbose=0, odemethod='LSODA'):
+           verbose=0, odemethod='RK45'):
 
     """ Solves the QLC-2 problem. Branched from the code in diffusionstuff11.py, it has units """
 
@@ -313,7 +121,9 @@ def run_f1d(\
     ylast = np.reshape(ylast,2*nx)
     ykeep_1D = [ylast]
     lastprogress = 0
-    sigmaI_mag = sigmaI.magnitude
+    sigmaI_mag = sigmaI.to('dimensionless').magnitude
+    sigma0_mag = sigma0.to('dimensionless').magnitude
+    print(sigmaI[0],sigmaI_mag[0],sigma0_mag)
     t1 = time()
     bj_list = rfft(NQLL_init_1D)
     j_list = np.array([j for j in range(len(bj_list))])
@@ -321,7 +131,7 @@ def run_f1d(\
 
     # Bundle parameters for ODE solver
     scalar_params = np.array(\
-            [Nbar, Nstar, sigma0.magnitude, nu_kin_mlyperus.magnitude, Doverdeltax2.magnitude, tau_eq.magnitude])
+            [Nbar, Nstar, sigma0_mag, nu_kin_mlyperus.magnitude, Doverdeltax2.magnitude, tau_eq.magnitude])
 
     # Loop over times
     for i in range(0,nt-1):
@@ -382,17 +192,17 @@ def run_f1d(\
     
     return Ntotkeep_1D, NQLLkeep_1D
 
-#@njit
-def f0d_solve_ivp(t, y, scalar_params, sigmaIcorner):
-    Nbar, Nstar, sigma0, nu_kin_mlyperus, tau_eq = scalar_params  # unpack parameters
+def f0d_solve_ivp(t, y, myparams):
+    Nbar, Nstar, sigmaI, sigma0, nu_kin_mlyperus, tau_eq = myparams  # unpack parameters
     NQLL0 = y[0]
     Ntot0 = y[1]      # unpack current values of y
 
     # Ntot deposition
     twopi = 2*np.pi
     m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
-    sigma_m = (sigmaIcorner - m * sigma0)
-    dNtot_dt = nu_kin_mlyperus * sigma_m
+    sigma_m = (sigmaI - m * sigma0)
+    depsurf = nu_kin_mlyperus * sigma_m
+    dNtot_dt = depsurf
     
     # NQLL
     dNQLL_dt = dNtot_dt - getDeltaNQLL(Ntot0,Nstar,Nbar,NQLL0)/tau_eq
@@ -401,26 +211,34 @@ def f0d_solve_ivp(t, y, scalar_params, sigmaIcorner):
     derivs = [dNQLL_dt, dNtot_dt]
     return derivs
 
-def run_f0d(NQLL_init_0D, Ntot_init_0D, times,\
-            Nbar, Nstar, sigma0, nu_kin_mlyperus, tau_eq, sigmaI_corner,
-            verbose=0, odemethod='LSODA'):
-    
-    # Prep for the integration
-    scalar_params = np.array([Nbar, Nstar, sigma0, nu_kin_mlyperus.magnitude, tau_eq.magnitude])
+def run_f0d( \
+    NQLL_init_0D,Ntot_init_0D,times,\
+           Nbar, Nstar, sigma0, nu_kin, t_eq, sigmaI_corner,\
+           AssignQuantity,\
+           verbose=0, odemethod='RK45'):
+
+    # Call the ODE solver
     ylast = np.array([NQLL_init_0D,Ntot_init_0D])
     ykeep_0D = [ylast]
     lastprogress = 0
-    
+    sigma0_mag = sigma0.to('dimensionless').magnitude
+    sigmaI_corner_mag = sigmaI_corner.to('dimensionless').magnitude
+
+    params = np.array([Nbar, Nstar, sigmaI_corner_mag, sigma0_mag, nu_kin.magnitude, t_eq.magnitude])
+
+    # scalar_params = np.array(\
+    #         [Nbar, Nstar, sigma0.magnitude, nu_kin_mlyperus.magnitude, Doverdeltax2.magnitude, tau_eq.magnitude])
+
+
     nt = len(times)
     for i in range(0,nt-1):
 
         # Specify the time interval of this step
         tinterval = [times[i].magnitude,times[i+1].magnitude]
+        # tinterval = [times[i],times[i+1]]
         
         # Integrate up to next time step
-        sol = solve_ivp(\
-              f0d_solve_ivp, tinterval, ylast, dense_output=True, args=(scalar_params,sigmaI_corner.magnitude),\
-              rtol=1e-12,method=odemethod)
+        sol = solve_ivp(f0d_solve_ivp, tinterval, ylast, dense_output=True, args=(params,),rtol=1e-12,method=odemethod)
         ylast = sol.y[:,-1]
 
         # Stuff into keeper arrays
@@ -430,15 +248,15 @@ def run_f0d(NQLL_init_0D, Ntot_init_0D, times,\
         progress = int(i/nt*100)
         if np.mod(progress,10) == 0:
             if progress > lastprogress:
-                #print(progress,'% done')
+                print(progress,'% done')
                 lastprogress = progress
 
-    #print('100% done')
+    print('100% done')
     ykeep_0D = np.array(ykeep_0D, np.float64)
     NQLLkeep_0D = ykeep_0D[:,0]
     Ntotkeep_0D = ykeep_0D[:,1]
 
-    return Ntotkeep_0D, NQLLkeep_0D          
+    return Ntotkeep_0D, NQLLkeep_0D 
 
 def get_D_of_T(T,AssignQuantity):
     """ Based on a log/inverse T fit to Price's data for supercooled liquid water """
@@ -473,6 +291,39 @@ def report_0d_growth_results(\
     
     return g_ice_QLC
 
+def report_1d_growth_results_with_sigma(\
+        x_QLC,tkeep_1Darr,NQLLkeep_1D,Ntotkeep_1D,Nicekeep_1D,sigmaI_QLC,itime=-1,):
+
+        fig = plt.figure(figsize=(9, 4))
+        gs = fig.add_gridspec(2, 2)
+        
+        # Column 1: two vertically stacked plots
+        ax1 = fig.add_subplot(gs[0, 0])
+        ax2 = fig.add_subplot(gs[1, 0])
+        
+        # Column 2: one plot spanning both rows
+        ax3 = fig.add_subplot(gs[:, 1])
+        
+        ax1.plot(x_QLC.magnitude, sigmaI_QLC.magnitude, '--')
+        ax1.grid(True)
+        ax1.set_ylabel('$\sigma_I (\%)$',fontsize=fontsize)
+        ax1.set_xticklabels([])
+    
+        ax2.plot(x_QLC.magnitude, Nicekeep_1D[itime,:], 'k', label='ice', lw=linewidth)
+        ax2.plot(x_QLC.magnitude, Ntotkeep_1D[itime,:], 'b', label='total', lw=linewidth)
+        ax2.set_ylabel('Thickness',fontsize=fontsize)
+        ax2.set_xlabel('$x (\mu m)$',fontsize=fontsize)
+        ax2.grid(True)
+
+        Nrange = np.max(Ntotkeep_1D[:,:],axis=1)-np.min(Ntotkeep_1D[:,:],axis=1)
+        ax3.plot(tkeep_1Darr.magnitude, Nrange)
+        ax3.grid(True)
+        ax3.set_xlabel('$t (ms)$',fontsize=fontsize)
+        ax3.set_ylabel('$N_{steps}$',fontsize=fontsize)
+        
+        plt.tight_layout()
+        plt.show()
+        return fig
 
 def report_1d_growth_results(\
          x_QLC,tkeep_1Darr,NQLLkeep_1D,Ntotkeep_1D,Nicekeep_1D,nmpermonolayer,lastfraction=0, title_params='', \
@@ -554,28 +405,6 @@ def getsigmaI(x,center_reduction,sigmaIcorner):
     fsig = x**2*(1-sigmapfac)+sigmapfac
     return fsig*sigmaIcorner
 
-# Not sure we use either of these so commenting them out
-# def getsigma_m(NQLL0,Nbar,Nstar,sigmaI,sigma0):
-#     m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
-#     sigma_m = (sigmaI - m * sigma0)
-#     return sigma_m
-
-# def pypr_getsigma_m(NQLL0,Nbar,Nstar,sigmaI,sigma0):
-#     m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
-#     sigma_m = (sigmaI - m * sigma0)
-#     return sigma_m
-
-# Commented out because I'm not sure we use it
-# #@njit
-# def f1d_sigma_m(y, t, params):
-#     Nbar, Nstar, sigmaI, sigma0, nu_kin_mlyperus, Doverdeltax2, nx = params
-#     NQLL0, Ntot0 = np.reshape(y,(2,nx))      # unpack current values of y
-    
-#     # Deposition
-#     m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
-#     sigma_m = (sigmaI - m * sigma0)
-#     return sigma_m
-
 def getDofTpow(T,AssignQuantity):
     """ Returns D in micrometers^2/microsecond """
     """ Assumes temperature in degrees K """
@@ -637,8 +466,12 @@ def run_f1d_FT(\
     # Prep for the integration
     nt = len(times)
     lastprogress = 0
-    sigmaI_mag = sigmaI.magnitude
+    sigmaI_mag = sigmaI.to('dimensionless').magnitude
+    # sigmaI_mag = sigmaI.magnitude
     SigmaI_mag = rfft(sigmaI_mag)
+    
+    sigma0_mag = sigma0.to('dimensionless').magnitude
+
     t1 = time()
     
     # This is to get j2_list because it's more efficient to pre-calculate it (but we'll use bj_list later too)
@@ -651,7 +484,6 @@ def run_f1d_FT(\
     cos_series = 1
     for i in range(len(NQLL_init_1D) - 1):
         cos_series += np.cos((i + 1) * j_list * np.pi / l)
-#     print('cos_series',cos_series)
 
     # Bundle parameters for ODE solver
     scalar_params = np.array([\
@@ -701,9 +533,20 @@ def run_f1d_FT(\
     # Convert to Cartesian values
     Ntotkeep_1D = irfft(Ykeep_Ntot_1D)
     NQLLkeep_1D = irfft(Ykeep_NQLL_1D)
+
+    # Duplicate the last time
+    Ntotkeep_1D_extended = duplicate_last_column(Ntotkeep_1D)
+    NQLLkeep_1D_extended = duplicate_last_column(NQLLkeep_1D)
     
     # Return the Cartesian values    
-    return Ntotkeep_1D, NQLLkeep_1D
+    return Ntotkeep_1D_extended, NQLLkeep_1D_extended
+    
+def duplicate_last_column(array):
+    nrow, ncol = np.shape(array)
+    extra_col = array[:,-1]
+    extra_col = extra_col.reshape(nrow,1)
+    result1 = np.append(array,extra_col,axis=1)
+    return result1
 
 def f1d_solve_ivp_FT(t, Y, scalar_params, SigmaI, j2_list):
 
@@ -739,6 +582,239 @@ def f1d_solve_ivp_FT(t, Y, scalar_params, SigmaI, j2_list):
     # Package up and return
     return np.concatenate((dbj_list_dt, daj_list_dt))
 
+def vapor_pressure_ice(T):
+
+    T_tp = 273.16             # K, triple-point temperature
+    P_tp = 611.657            # Pa, triple-point pressure
+    DeltaH_sub = 51.0e3       # J mol^-1, enthalpy of sublimation
+    R = 8.314
+
+    """
+    Equilibrium vapor pressure of water over ice
+    using the integrated Clausius-Clapeyron equation
+    referenced to the triple point.
+
+    Parameters
+    ----------
+    T : float or array_like
+        Temperature in K
+
+    Returns
+    -------
+    P : float or ndarray
+        Equilibrium vapor pressure in Pa
+    """
+    T = np.asarray(T)
+
+    return P_tp * np.exp(
+        -DeltaH_sub / R * (1.0 / T - 1.0 / T_tp)
+    )
+
+# Code below here was taken from QLCstuff2.py
+def get_L_cr_of_T(Temperature,AssignQuantity):
+    aT = 9.341579E-09
+    bT = 9.857504E-02
+    L_cr_of_T = aT * np.exp(bT*Temperature.magnitude)
+    return L_cr_of_T
+
+def get_L_cr_of_P(Pressure,AssignQuantity): 
+    aP = 18041.86122836
+    bP = -1.09599342
+    L_cr_of_P = aP * Pressure.magnitude**(bP)
+    return L_cr_of_P
+    
+def get_L_cr_of_TP(Temperature,Pressure,AssignQuantity): 
+    L_cr_of_T = get_L_cr_of_T(Temperature,AssignQuantity)
+    Temperature_ref = AssignQuantity(240,'K')
+    L_cr_of_T_ref = get_L_cr_of_T(Temperature_ref,AssignQuantity)
+    L_cr_of_P = get_L_cr_of_P(Pressure,AssignQuantity)
+    L_cr_of_TP = L_cr_of_T/L_cr_of_T_ref*L_cr_of_P
+    return L_cr_of_TP
+
+def get_cr_of_T(L,Temperature,AssignQuantity): 
+    cr = L/get_L_cr_of_T(Temperature,AssignQuantity)
+    return cr
+
+def get_cr_of_P(L,Pressure,AssignQuantity): 
+    cr = L/get_L_cr_of_P(Pressure,AssignQuantity)
+    return cr
+
+def get_cr_of_TP(L,Temperature,Pressure,AssignQuantity):     
+#     Temperature_ref = AssignQuantity(240,'K')
+#     L_cr_T = get_L_cr_of_T(Temperature,AssignQuantity)
+#     L_cr_Tref = get_L_cr_of_T(Temperature_ref,AssignQuantity)
+#     L_cr_P = get_L_cr_of_P(Pressure,AssignQuantity)
+#     L_cr = L_cr_T/L_cr_Tref*L_cr_P
+    L_cr_of_TP = get_L_cr_of_TP(Temperature,Pressure,AssignQuantity)
+    cr_of_TP = L/L_cr_of_TP
+    return cr_of_TP
+
+def get_system_parameters(inputfile,AssignQuantity):
+    print('\nUsing parameter file '+inputfile+' ...')
+    GI=f90nml.read(inputfile)['GI'] # Read the main parameter namelist
+    
+    # Supersaturation at the corner of a facet
+    sigmaI_corner = GI['sigmaI_corner']
+    sigmaI_corner_units = GI['sigmaI_corner_units']
+    sigmaI_corner = AssignQuantity(sigmaI_corner,sigmaI_corner_units)
+    print('sigmaI_corner =', sigmaI_corner)
+    
+    # Difference in equilibrium supersaturation between microsurfaces I and II
+    sigma0 = GI['sigma0']
+    sigma0_units = GI['sigma0_units']
+    sigma0 = AssignQuantity(sigma0,sigma0_units)
+    print('sigma0 =',sigma0)
+    
+    # Reduction of supersaturation at the facet cental
+    c_r = GI['c_r']
+    c_r_units = GI['c_r_units']
+    c_r = AssignQuantity(c_r,c_r_units)
+    print('c_r =',c_r)
+    
+    # Properties of the QLL
+    Nbar = GI['Nbar']; print('Nbar', Nbar)
+    Nstar = GI['Nstar']; print('Nstar', Nstar)
+    
+    # Thickness of monolayers
+    h_layer = GI['h_layer']
+    h_layer_units = GI['h_layer_units']
+    h_layer = AssignQuantity(h_layer,h_layer_units) 
+    print('h_layer =', h_layer)
+    
+    # Diffusion coeficient
+    D = GI['D']
+    D_units = GI['D_units']
+    D = AssignQuantity(D,D_units)
+    print('D =', D)
+    
+    # Deposition velocity
+    nu_kin = GI['nu_kin']
+    nu_kin_units = GI['nu_kin_units']
+    nu_kin = AssignQuantity(nu_kin,nu_kin_units)
+    print('nu_kin =', nu_kin)
+    
+    # Size of the facet
+    L = GI['L']
+    L_units = GI['L_units']
+    L = AssignQuantity(L,L_units)
+    print('L =', L)
+    
+    # Crystal size -- needs to be an even number
+    nx_crystal = GI['nx_crystal']
+    print('nx (crystal) =', nx_crystal)
+    
+    # Time constant for freezing/thawing
+    t_eq = GI['t_eq']
+    t_eq_units = GI['t_eq_units']
+    t_eq = AssignQuantity(t_eq,t_eq_units)
+    print('t_eq =',t_eq)
+    
+    # Handy derived quantities
+    x_QLC = np.linspace(-L,L,nx_crystal)
+    deltax = x_QLC[1]-x_QLC[0]
+    print('Spacing of points on the ice surface =', deltax)
+    sigmaI_QLC = sigmaI_corner*(c_r*(x_QLC/L)**2+1-c_r)
+    sigmaI_QLC.ito('dimensionless')
+    sigma0.ito('dimensionless')
+    Doverdeltax2 = D/deltax**2
+    DoverL2pi2 = D/L**2*np.pi**2
+    omega_kin = nu_kin * t_eq
+    print('omega_kin =',omega_kin)
+
+    # Get out
+    return sigmaI_corner, sigma0, c_r, sigmaI_QLC, Nbar, Nstar, h_layer, D, nu_kin, L, nx_crystal, t_eq, x_QLC, DoverL2pi2, Doverdeltax2
+
+def get_runtime_parameters(inputfile, nx_crystal, Nstar, Nbar, AssignQuantity):
+    print('\nUsing parameter file '+inputfile+' ...')
+    RT=f90nml.read(inputfile)['RT'] # Read the main parameter namelist
+    
+    # How long
+    runtime = RT['runtime']
+    runtime_units = RT['runtime_units']
+    runtime = AssignQuantity(runtime,runtime_units)
+    print('runtime =', runtime)
+    runtime.ito('microsecond')
+    
+    # Number of time steps to keep for reporting later
+    ntimes = RT['ntimes']
+    
+    # Integration algorithm (possibilities: RK45, BDF, RK23, DOP853, LSODA, and Radau)
+    odemethod = RT['odemethod']
+    print('odemethod =',odemethod)
+    
+    # Specify the time interval and initial conditions
+    tkeep_1Darr = np.linspace(0,runtime,ntimes)
+    Ntot_init_1D = np.ones(nx_crystal)
+    NQLL_init_1D = getNQLL(Ntot_init_1D,Nstar,Nbar)
+    
+    print('This is a run from time', tkeep_1Darr[0].to('msec'),'to', tkeep_1Darr[-1].to('msec'))
+    print('dt =', tkeep_1Darr[1]-tkeep_1Darr[0])
+
+    # Get out
+    return odemethod, tkeep_1Darr, Ntot_init_1D, NQLL_init_1D
+
+
+# #@njit
+# def pypr_getDeltaNQLL(Ntot_pr,Ntot_pyneg,Ntot_pypos,alpha_pr,alpha_pyneg,alpha_pypos,Nstar_pr,Nstar_py,Nbar,NQLL_pr):
+#     NQLL_eq_pr    = Nbar - Nstar_pr*np.sin(2*np.pi*Ntot_pr)
+#     NQLL_eq_pyneg = Nbar - Nstar_py*np.sin(2*np.pi*Ntot_pyneg)
+#     NQLL_eq_pypos = Nbar - Nstar_py*np.sin(2*np.pi*Ntot_pypos)
+#     NQLL_eq = alpha_pr*NQLL_eq_pr + alpha_pyneg*NQLL_eq_pyneg + alpha_pypos*NQLL_eq_pypos
+#     return NQLL_pr - NQLL_eq
+
+# def pypr_solve_ivp(t, y, scalar_params, sigmaI, j_list, j2_list, x_QLC):
+#     Nbar, Nstar_pr, Nstar_py, sigma0_pr, sigma0_py, nu_kin_mlyperus, DoverdeltaX2, tau_eq, \
+#     theta, beta_trans, delta_beta, \
+#     h_pr, h_py, microfacets = scalar_params
+#     l = int(len(y)/2)
+#     NQLL0 = NQLL_pr = y[:l]
+#     Ntot0 = Ntot_pr = y[l:]
+    
+#     # Using numpy's gradient method to get the first derivative of (scaled) Ntot
+#     z_pr = h_pr * Ntot_pr
+#     dx = x_QLC[1]-x_QLC[0]
+#     beta = np.gradient(z_pr,dx)
+    
+#     # Deposition from air
+#     if microfacets == 1.0:
+#         # Calculating the weights
+#         alpha_pyneg = get_alpha(beta,-beta_trans,delta_beta)
+#         alpha_pypos = 1-get_alpha(beta, beta_trans,delta_beta)
+#         alpha_pr = 1 - alpha_pyneg - alpha_pypos
+ 
+#         # Ntot deposition
+#         m_pr = (NQLL0 -(Nbar-Nstar_pr))/(2*Nstar_pr)
+#         sigma_m_pr = (sigmaI - m_pr * sigma0_pr)    
+#         m_py = (NQLL0 -(Nbar-Nstar_py))/(2*Nstar_py); 
+#         sigma_m_py = (sigmaI - m_py * sigma0_py)
+#         sigma_m = alpha_pyneg*sigma_m_py + alpha_pypos*sigma_m_py + alpha_pr*sigma_m_pr  
+#     else:
+#         m_pr = (NQLL0 -(Nbar-Nstar_pr))/(2*Nstar_pr)
+#         sigma_m = (sigmaI - m_pr * sigma0_pr) 
+#     dNtot_dt = nu_kin_mlyperus * sigma_m
+
+#     # Add in surface diffusion (based on FT)
+#     angles = np.arctan(beta) # Default is radians
+#     costerm = np.cos(angles)
+#     Dcoefficient1 = 4*DoverdeltaX2/l**2*np.pi**2 *costerm**2
+#     bj_list = rfft(NQLL0)
+#     cj_list = bj_list*j2_list
+#     dy = -Dcoefficient1  * irfft(cj_list)
+#     dNtot_dt += dy
+
+#     # NQLL
+#     if microfacets == 1.0:
+#         Ntot_pyneg = 1/h_py * (np.cos(theta)*h_pr* Ntot_pr -np.sin(theta)*x_QLC)
+#         Ntot_pypos = 1/h_py * (np.cos(theta)*h_pr* Ntot_pr +np.sin(theta)*x_QLC)
+#         dNQLL_dt = dNtot_dt - pypr_getDeltaNQLL(\
+#             Ntot_pr,Ntot_pyneg,Ntot_pypos,alpha_pr,alpha_pyneg,alpha_pypos,Nstar_pr,Nstar_py,Nbar,NQLL_pr)\
+#             /tau_eq
+#     else:
+#         dNQLL_dt = dNtot_dt - getDeltaNQLL(Ntot0,Nstar_pr,Nbar,NQLL0)/tau_eq
+    
+#     # Package for output
+#     return np.concatenate((dNQLL_dt, dNtot_dt))
+
 
 # #@njit
 # def pypr_getNQLL(Ntot_pr,Ntot_pyneg,Ntot_pypos,alpha_pr,alpha_pyneg,alpha_pypos,Nstar_pr,Nstar_py,Nbar):
@@ -754,4 +830,263 @@ def f1d_solve_ivp_FT(t, Y, scalar_params, SigmaI, j2_list):
 #     L = x_QLC[-1]
 #     beta = irfft(dZpr_dx)*np.pi/L
 
+
+# def smoothout(x_QLC,Ntot_pr,deltax,d2Ntot_dx2_threshold,verbose=0):
+#     dNtot_dx = np.gradient(Ntot_pr,deltax)#; print(dNtot_dx.units)
+#     d2Ntot_dx2 = np.gradient(dNtot_dx,deltax)#; print(d2Ntot_dx2.units)
+#     ismoothlist = np.argwhere(d2Ntot_dx2<-d2Ntot_dx2_threshold)
+#     ismoothlist = ismoothlist.reshape(-1)
+#     if verbose > 0:
+#         print('Shape of the smooth list is ', ismoothlist.shape)
+#     Ntot_pr_smoothed = np.copy(Ntot_pr)
+#     nbefore = 2; #print(nbefore)
+#     nafter = nbefore+1; #print(nafter)
+#     nx = len(x_QLC)
+
+#     for ismooth in ismoothlist:
+#         if ismooth >= nbefore and ismooth <= nx-nafter:
+#             x = x_QLC[ismooth-nbefore:ismooth+nafter]; #print("here is x", x)
+#             x = np.delete(x,nbefore); #print("here is x", x)
+#             y = Ntot_pr[ismooth-nbefore:ismooth+nafter]; #print("here is y",y)
+#             y = np.delete(y,nbefore); #print("here is y", y)
+#             spl = myinterpolator(x,y)
+#             ynew = spl(x[nbefore]) # same as spl(x_QLC[ismooth])
+#             Ntot_pr_smoothed[ismooth] = ynew
+
+#         elif ismooth == nx-2:
+#             if verbose > 0:
+#                 print('Linear smoothing at the end of the array')
+#             Ntot_pr_smoothed[ismooth] = (Ntot_pr[-3]+Ntot_pr[-1])/2
+
+#         elif ismooth == 1:
+#             if verbose > 0:
+#                 print('Linear smoothing at the beginning of the array')
+#             Ntot_pr_smoothed[ismooth] = (Ntot_pr[0]+Ntot_pr[2])/2
+                 
+#     return d2Ntot_dx2, Ntot_pr_smoothed
+
+# def run_pypr(\
+#            NQLL_init_1D,Ntot_init_1D,times,\
+#            Nbar, Nstar, sigma0, nu_kin_mlyperus, Doverdeltax2, tau_eq, \
+#            theta, beta_trans_factor, Nstarfactor, h_pr, h_pyfactor, sigma0factor,\
+#            sigmaI, x_QLC, d2Ntot_dx2_threshold,\
+#            AssignQuantity,\
+#            verbose=0, odemethod='RK45', microfacets=0):
+
+#     """ Solves the QLC-2 problem with pyramidal as well as prismatic facet possibilities. """
+
+#     # Prep for the integration
+#     nt = len(times)
+#     nx = len(NQLL_init_1D)
+#     ylast = np.array([NQLL_init_1D,Ntot_init_1D])
+#     ylast = np.reshape(ylast,2*nx)
+#     ykeep_1D = [ylast]
+#     lastprogress = 0
+#     sigmaI_mag = sigmaI.magnitude
+#     x_QLC_mag = x_QLC.magnitude
+#     t1 = time()
+#     bj_list = rfft(NQLL_init_1D)
+#     j_list = np.array([j for j in range(len(bj_list))])
+#     j2_list = np.array(j_list)**2
+    
+#     # Integration prep having to do with multiple microfacets
+#     theta.ito('radian')
+#     beta_trans = np.sin(theta/2)/np.cos(theta/2)
+#     delta_beta = beta_trans/beta_trans_factor
+#     h_pr.ito('micrometer')
+#     h_py = h_pr*h_pyfactor
+#     Nstar_pr = Nstar
+#     Nstar_py = Nstar_pr*Nstarfactor
+#     sigma0_pr = sigma0.magnitude
+#     sigma0_py = sigma0.magnitude*sigma0factor
+    
+#     # This is prep for attempting to smooth Ntot
+#     deltax_mag = x_QLC_mag[1]-x_QLC_mag[0]
+#     d2Ntot_dx2_threshold_mag = d2Ntot_dx2_threshold.magnitude
+
+#     # Bundle parameters for ODE solver
+#     scalar_params = np.array(\
+#       [Nbar, Nstar_pr, Nstar_py, sigma0_pr, sigma0_py, nu_kin_mlyperus.magnitude, Doverdeltax2.magnitude, tau_eq.magnitude, \
+#        theta.magnitude, beta_trans.magnitude, delta_beta.magnitude,
+#        h_pr.magnitude, h_py.magnitude, microfacets])
+
+#     # Loop over times
+#     for i in range(0,nt-1):
+                
+#         # Specify the time interval of this step
+#         tinterval = [times[i].magnitude,times[i+1].magnitude]
+        
+#         # Integrate up to next time step
+#         sol = solve_ivp(\
+#             pypr_solve_ivp, tinterval, ylast, args=(scalar_params, sigmaI_mag, j_list, j2_list, x_QLC_mag), \
+#             rtol=1e-12, method=odemethod) 
+#         ylast = sol.y[:,-1]
+        
+#         # Symmetrizing
+#         ylast = np.array(ylast, dtype=np.complex128)
+#         ylast_reshaped = np.reshape(ylast,(2,nx))
+#         NQLL_last = ylast_reshaped[0,:]
+#         Ntot_last = ylast_reshaped[1,:]
+#         nx_mid = int(nx/2)
+#         for j in range(0,nx_mid):
+#             jp = nx -j -1
+#             Ntot_last[j] = Ntot_last[jp]
+#             NQLL_last[j] = NQLL_last[jp]
+#         ylast = np.array([NQLL_last,Ntot_last])
+#         ylast = np.reshape(ylast,2*nx)
+#         ylast = np.real(ylast)
+
+#         # Smoothing
+#         ylast_1Darray = np.array(ylast, np.float64); 
+#         ylast_1Darray_reshaped = np.reshape(ylast_1Darray,(2,nx))
+#         Ntot_pr = ylast_1Darray_reshaped[1,:]; #print('Ntot_pr has shape', np.shape(Ntot_pr))
+#         NQLL_pr = ylast_1Darray_reshaped[0,:]; #print('NQLL_pr has shape', np.shape(NQLL_pr))
+#         d2Ntot_dx2, Ntot_pr_smoothed = smoothout(x_QLC_mag,Ntot_pr,deltax_mag,d2Ntot_dx2_threshold_mag,verbose)
+#         ylast = np.array([NQLL_pr,Ntot_pr_smoothed])
+#         ylast = np.reshape(ylast,2*nx)
+
+#         # Stuff into keeper arrays
+#         ykeep_1D.append(ylast)
+        
+#         # Progress reporting
+#         progress = int(i/nt*100)
+#         if np.mod(progress,10) == 0:
+#             if progress > lastprogress:
+#                 t2 = time()
+#                 elapsed = (t2 - t1)/60
+#                 print(progress,'%'+' elapsed time is %.3f minutes' %elapsed)
+#                 lastprogress = progress
+
+#     print('100% done')
+#     print('status = ', sol.status)
+#     print('message = ', sol.message)
+#     print(dir(sol))
+    
+#     ykeep_1D = np.array(ykeep_1D, np.float64)
+#     ykeep_1Darr = np.array(ykeep_1D, np.float64)
+#     ykeep_1Darr_reshaped = np.reshape(ykeep_1Darr,(nt,2,nx))
+#     Ntotkeep_1D = ykeep_1Darr_reshaped[:,1,:]
+#     NQLLkeep_1D = ykeep_1Darr_reshaped[:,0,:]
+    
+#     return Ntotkeep_1D, NQLLkeep_1D
+
+
+#@njit
+# def f0d_solve_ivp(t, y, scalar_params, sigmaIcorner):
+#     Nbar, Nstar, sigma0, nu_kin_mlyperus, tau_eq = scalar_params  # unpack parameters
+#     NQLL0 = y[0]
+#     Ntot0 = y[1]      # unpack current values of y
+
+#     # Ntot deposition
+#     twopi = 2*np.pi
+#     m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
+#     sigma_m = (sigmaIcorner - m * sigma0)
+#     dNtot_dt = nu_kin_mlyperus * sigma_m
+    
+#     # NQLL
+#     dNQLL_dt = dNtot_dt - getDeltaNQLL(Ntot0,Nstar,Nbar,NQLL0)/tau_eq
+    
+#     # Packaging up for output
+#     derivs = [dNQLL_dt, dNtot_dt]
+#     return derivs
+
+# def run_f0d(NQLL_init_0D, Ntot_init_0D, times,\
+#             Nbar, Nstar, sigma0, nu_kin_mlyperus, tau_eq, sigmaI_corner,
+#             verbose=0, odemethod='LSODA'):
+    
+#     # Prep for the integration
+#     scalar_params = np.array([Nbar, Nstar, sigma0, nu_kin_mlyperus.magnitude, tau_eq.magnitude])
+#     ylast = np.array([NQLL_init_0D,Ntot_init_0D])
+#     ykeep_0D = [ylast]
+#     lastprogress = 0
+    
+#     nt = len(times)
+#     for i in range(0,nt-1):
+
+#         # Specify the time interval of this step
+#         tinterval = [times[i].magnitude,times[i+1].magnitude]
+        
+#         # Integrate up to next time step
+#         sol = solve_ivp(\
+#               f0d_solve_ivp, tinterval, ylast, dense_output=True, args=(scalar_params,sigmaI_corner.magnitude),\
+#               rtol=1e-12,method=odemethod)
+#         ylast = sol.y[:,-1]
+
+#         # Stuff into keeper arrays
+#         ykeep_0D.append(ylast)
+        
+#         # Progress reporting
+#         progress = int(i/nt*100)
+#         if np.mod(progress,10) == 0:
+#             if progress > lastprogress:
+#                 #print(progress,'% done')
+#                 lastprogress = progress
+
+#     #print('100% done')
+#     ykeep_0D = np.array(ykeep_0D, np.float64)
+#     NQLLkeep_0D = ykeep_0D[:,0]
+#     Ntotkeep_0D = ykeep_0D[:,1]
+
+#     return Ntotkeep_0D, NQLLkeep_0D    
+
+# def run_f0d(NQLL_init_0D, Ntot_init_0D, times,\
+#             Nbar, Nstar, sigma0, nu_kin_mlyperus, tau_eq, sigmaI_corner,
+#             verbose=0, odemethod='LSODA'):
+    
+#     # Prep for the integration
+#     scalar_params = np.array([Nbar, Nstar, sigma0, nu_kin_mlyperus.magnitude, tau_eq.magnitude])
+#     ylast = np.array([NQLL_init_0D,Ntot_init_0D])
+#     ykeep_0D = [ylast]
+#     lastprogress = 0
+    
+#     nt = len(times)
+#     for i in range(0,nt-1):
+
+#         # Specify the time interval of this step
+#         tinterval = [times[i].magnitude,times[i+1].magnitude]
+        
+#         # Integrate up to next time step
+#         sol = solve_ivp(\
+#               f0d_solve_ivp, tinterval, ylast, dense_output=True, args=(scalar_params,sigmaI_corner.magnitude),\
+#               rtol=1e-12,method=odemethod)
+#         ylast = sol.y[:,-1]
+
+#         # Stuff into keeper arrays
+#         ykeep_0D.append(ylast)
+        
+#         # Progress reporting
+#         progress = int(i/nt*100)
+#         if np.mod(progress,10) == 0:
+#             if progress > lastprogress:
+#                 #print(progress,'% done')
+#                 lastprogress = progress
+
+#     #print('100% done')
+#     ykeep_0D = np.array(ykeep_0D, np.float64)
+#     NQLLkeep_0D = ykeep_0D[:,0]
+#     Ntotkeep_0D = ykeep_0D[:,1]
+
+    # return Ntotkeep_0D, NQLLkeep_0D          
+
+# Not sure we use either of these so commenting them out
+# def getsigma_m(NQLL0,Nbar,Nstar,sigmaI,sigma0):
+#     m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
+#     sigma_m = (sigmaI - m * sigma0)
+#     return sigma_m
+
+# def pypr_getsigma_m(NQLL0,Nbar,Nstar,sigmaI,sigma0):
+#     m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
+#     sigma_m = (sigmaI - m * sigma0)
+#     return sigma_m
+
+# Commented out because I'm not sure we use it
+# #@njit
+# def f1d_sigma_m(y, t, params):
+#     Nbar, Nstar, sigmaI, sigma0, nu_kin_mlyperus, Doverdeltax2, nx = params
+#     NQLL0, Ntot0 = np.reshape(y,(2,nx))      # unpack current values of y
+    
+#     # Deposition
+#     m = (NQLL0 - (Nbar - Nstar))/(2*Nstar)
+#     sigma_m = (sigmaI - m * sigma0)
+#     return sigma_m
 

@@ -1,0 +1,7 @@
+&RT
+   runtime = 200
+   runtime_units = 'microsecond'
+   ntimes = 400
+   odemethod = 'RK45' 
+   verbose = 0
+/

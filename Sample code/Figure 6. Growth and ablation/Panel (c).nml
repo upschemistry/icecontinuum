@@ -1,0 +1,31 @@
+&GI
+   sigma0 = 20
+   sigma0_units = 'percent'
+   sigmaI_corner = 22
+   sigmaI_corner_units = 'percent'
+   c_r = 0.03
+   c_r_units = 'percent'
+   nu_kin = 0.0365
+   nu_kin_units = '1/microsecond'
+   t_eq = 0.75
+   t_eq_units = 'microsecond'
+   nx_crystal = 501 
+   Nbar = 1
+   Nstar = .1
+   h_layer = 0.37
+   h_layer_units = 'nanometer'
+   D = 0.0002
+   D_units = 'micrometer^2/microsecond'
+   L = 50
+   L_units = 'micrometer'   
+   d2Ntot_dx2_threshold = 10000
+   d2Ntot_dx2_threshold_units = '1/micrometer^2'
+/ 
+
+&RT
+   runtime = 7500
+   runtime_units = 'ms'
+   ntimes = 50
+   odemethod = 'RK45' 
+   verbose = 0
+/

@@ -1,0 +1,37 @@
+These parameters lay out a standard limit-cycle scenario. The value of nu_kin here, 0.264, corresponds to a temperature of 249.2 K, assuming h_layer=0.37 (a prismatic facet)
+
+&GI
+   sigma0 = 20
+   sigma0_units = 'percent'
+   sigmaI_corner = 22
+   sigmaI_corner_units = 'percent'
+   c_r = 0.2
+   c_r_units = 'percent'
+   nu_kin = 0.264
+   nu_kin_units = '1/microsecond'
+   t_eq = 1.5
+   t_eq_units = 'microsecond'
+   nx_crystal = 501 
+   Nbar = 1
+   Nstar = .1
+   h_layer = 0.37
+   h_layer_units = 'nanometer'
+   D = 0.0002
+   D_units = 'micrometer^2/microsecond'
+   L = 50
+   L_units = 'micrometer'   
+   d2Ntot_dx2_threshold = 10000
+   d2Ntot_dx2_threshold_units = '1/micrometer^2'
+/ 
+
+&RT
+   runtime = 300
+   runtime_units = 'ms'
+   ntimes = 50
+   odemethod = 'RK45' 
+   verbose = 0
+/
+
+Notes: 
+Limit cycle is achieved after about 200 ms
+Possible values for odemethod include RK45, BDF, RK23, DOP853, LSODA, and Radau
