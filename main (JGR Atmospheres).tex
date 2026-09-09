@@ -1,0 +1,941 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% AGUJournalTemplate.tex: this template file is for articles formatted with LaTeX
+%
+% This file includes commands and instructions
+% given in the order necessary to produce a final output that will
+% satisfy AGU requirements, including customized APA reference formatting.
+%
+% You may copy this file and give it your
+% article name, and enter your text.
+%
+% guidelines and troubleshooting are here: 
+
+%% To submit your paper:
+\documentclass[draft]{agujournal2019}
+\usepackage{url} %this package should fix any errors with URLs in refs.
+\usepackage{lineno}
+% \usepackage[inline]{trackchanges} %for better track changes. finalnew option will compile document with changes incorporated.
+\usepackage{soul}
+\usepackage{amsmath}
+% \setlength{\belowdisplayskip}{12pt}
+% \setlength{\belowdisplayshortskip}{12pt}
+\usepackage{float}
+% \usepackage{lipsum}
+\usepackage{amsfonts}
+\usepackage{graphicx}
+% \usepackage{epstopdf}
+% \usepackage{algorithmic}
+\linenumbers
+%%%%%%%
+% As of 2018 we recommend use of the TrackChanges package to mark revisions.
+% The trackchanges package adds five new LaTeX commands:
+%
+%  \note[editor]{The note}
+%  \annote[editor]{Text to annotate}{The note}
+%  \add[editor]{Text to add}
+%  \remove[editor]{Text to remove}
+%  \change[editor]{Text to remove}{Text to add}
+%
+% complete documentation is here: http://trackchanges.sourceforge.net/
+%%%%%%%
+
+\draftfalse
+
+%% Enter journal name below.
+%% Choose from this list of Journals:
+%
+% JGR: Atmospheres
+% JGR: Biogeosciences
+% JGR: Earth Surface
+% JGR: Oceans
+% JGR: Planets
+% JGR: Solid Earth
+% JGR: Space Physics
+% Global Biogeochemical Cycles
+% Geophysical Research Letters
+% Paleoceanography and Paleoclimatology
+% Radio Science
+% Reviews of Geophysics
+% Tectonics
+% Space Weather
+% Water Resources Research
+% Geochemistry, Geophysics, Geosystems
+% Journal of Advances in Modeling Earth Systems (JAMES)
+% Earth's Future
+% Earth and Space Science
+% Geohealth
+%
+% ie, \journalname{Water Resources Research}
+
+\journalname{JGR: Atmospheres}
+
+
+\begin{document}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  TITLE
+%
+% (A title should be specific, informative, and brief. Use
+% abbreviations only if they are defined in the abstract. Titles that
+% start with general keywords then specific terms are optimized in
+% searches)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Example: \title{This is a test title}
+
+\title{A revised micrometer-scale theory of ice crystal surface dynamics}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  AUTHORS AND AFFILIATIONS
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Authors are individuals who have significantly contributed to the
+% research and preparation of the article. Group authors are allowed, if
+% each author in the group is separately identified in an appendix.)
+
+% List authors by first name or initial followed by last name and
+% separated by commas. Use \affil{} to number affiliations, and
+% \thanks{} for author notes.
+% Additional author notes should be indicated with \thanks{} (for
+% example, for current addresses).
+
+% Example: \authors{A. B. Author\affil{1}\thanks{Current address, Antartica}, B. C. Author\affil{2,3}, and D. E.
+% Author\affil{3,4}\thanks{Also funded by Monsanto.}}
+
+%\authors{=list all authors here=}
+\authors{
+Steven Neshyba\affil{1,2},
+Shaker Albuhaisi\affil{1},
+Tia B\"ottger\affil{1},
+Rohan Crossland\affil{1},
+Maximilian Bloom\affil{1},
+Spencer Racca-Gwozdzik\affil{1},
+Ella Slattery\affil{1},
+Noah Zimmer\affil{1},
+Ezra Thill\affil{1},
+Penny Rowe\affil{3},
+Daniel Neshyba-Rowe\affil{2},
+Jacob Price\affil{1}
+}
+
+% \author{Steven Neshyba\thanks{University of Puget Sound, Tacoma, WA; NorthWest Research Associates, Redmond, WA
+%   (\email{nesh@pugetsound.edu}).}
+% \and Shaker Albuhaisi\thanks{University of Puget Sound, Tacoma, WA
+%   (\email{shakeremad72@gmail.com}).}
+% \and Tia B\"ottger\thanks{University of Puget Sound, Tacoma, WA
+%   (\email{tiabottger@gmail.com}).}
+%   \and Rohan Crossland\thanks{University of Puget Sound, Tacoma, WA
+%   (\email{crosslandrohan@gmail.com}).}
+% \and Maximilian Bloom\thanks{University of Puget Sound, Tacoma, WA
+%   (\email{maximilianpbloom@icloud.com}).}
+% \and Spencer Racca-Gwozdzik\thanks{University of Puget Sound, Tacoma, WA
+%   (\email{sraccagwozdzik@pugetsound.edu}).}
+% \and Ella Slattery\thanks{University of Puget Sound, Tacoma, WA
+%   (\email{elslattery4@gmail.com}).}
+% \and Noah Zimmer\thanks{University of Puget Sound, Tacoma, WA
+%   (\email{nzimmer3.14@gmail.com}).}
+% \and Ezra Thill\thanks{University of Puget Sound, Tacoma, WA
+%   (\email{thillerin@gmail.com}).}
+% \and Penny Rowe\thanks{Four Peaks Environmental, Seattle, WA
+%   (\email{prowe@fourpeaksenv.com}).}
+% Daniel: rowedaniel@nwra.com
+% \and Jacob Price\thanks{University of Puget Sound, Tacoma, WA
+%   (\email{jrprice@pugetsound.edu}).}
+
+
+
+\affiliation{1}{University of Puget Sound, Tacoma, WA, USA}
+\affiliation{2}{NorthWest Research Associates, Seattle, WA, USA}
+\affiliation{3}{Four Peaks Environmental, Seattle, WA, USA}
+
+\correspondingauthor{Steven Neshyba}{nesh@pugetsound.edu}
+
+
+
+% Corresponding author mailing address and e-mail address:
+
+% (include name and email addresses of the corresponding author.  More
+% than one corresponding author is allowed in this LaTeX file and for
+% publication; but only one corresponding author is allowed in our
+% editorial system.)
+
+% Example: \correspondingauthor{First and Last Name}{email@address.edu}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% KEY POINTS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  List up to three key points (at least one is required)
+%  Key Points summarize the main points and conclusions of the article
+%  Each must be 140 characters or fewer with no special characters or punctuation and must be complete sentences
+
+% Example:
+% \begin{keypoints}
+% \item	List up to three key points (at least one is required)
+% \item	Key Points summarize the main points and conclusions of the article
+% \item	Each must be 140 characters or fewer with no special characters or punctuation and must be complete sentences
+% \end{keypoints}
+
+\begin{keypoints}
+\item A micrometer-scale model of ice surface dynamics is revised to include explicit timescales for quasiliquid/ice equilibration.
+\item Cryoscopic SEM experiments and molecular dynamics simulations supply key insights and parameters.
+\item Spontaneous surface reorganization in response to uneven distribution of overlying vapor makes faceting surprisingly robust.
+
+\end{keypoints}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  ABSTRACT and PLAIN LANGUAGE SUMMARY
+%
+% A good Abstract will begin with a short description of the problem
+% being addressed, briefly describe the new data or analyses, then
+% briefly states the main conclusion(s) and how they are supported and
+% uncertainties.
+
+% The Plain Language Summary should be written for a broad audience,
+% including journalists and the science-interested public, that will not have 
+% a background in your field.
+%
+% A Plain Language Summary is required in GRL, JGR: Planets, JGR: Biogeosciences,
+% JGR: Oceans, G-Cubed, Reviews of Geophysics, and JAMES.
+% see http://sharingscience.agu.org/creating-plain-language-summary/)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% \begin{abstract} starts the second page
+
+\begin{abstract}
+We explore the hypothesis that a key factor in the growth and ablation dynamics of faceted ice crystals is the quasiliquid layer that forms at the ice-vapor interface. We do so by modifying a previous formulation, a pair of micrometer-scale reaction-diffusion equations, to contain an explicit timescale of quasiliquid freezing and melting. We also use ice surface topology information derived from cryoscopic scanning electron microscopy experiments, as well as numerical simulations of vapor concentrations around ice crystals, to constrain parameters of the new formulation. The resulting picture is a robust nonlinear-dynamical mechanism for faceted growth and ablation, reminiscent of Turing's theory of spontaneous pattern formation, involving a limit cycle for the thickness of the quasiliquid layer and a traveling wave for the underlying ice.
+\end{abstract}
+
+\section*{Plain Language Summary}
+Ice surfaces are known to be covered by a thin layer of liquid-like water, called a quasiliquid layer, or QLL. The QLL is thought to make possible familiar activities such as skiing and ice skating. But the QLL also presents problems from a theoretical standpoint, in that it is not understood how ice crystals that make up important cloud types in Earth's atmosphere -- cirrus clouds -- form in its presence. The root of the problem is that those ice crystals, unlike snow crystals, form compact hexagonal shapes with flat, smooth surfaces. One might think that the solution is obvious, that the QLL sloshes around enough to even out possible bumps in the surface, but that turns out not to be the case. Instead, our results reveal that a spontaneous process of reorganization of the surface occurs on an ongoing basis, such that regions where the QLL is thicker are also less efficient at capturing new water vapor, which locks in a common rate of growth across the surface as a whole.
+
+% Here are instructions on writing a Plain Language Summary: 
+% https://www.agu.org/Share-and-Advocate/Share/Community/Plain-language-summary
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  BODY TEXT
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%% Suggested section heads:
+
+\section{Introduction}
+Ice crystals that make up cirrus clouds modulate Earth’s climate by scattering sunlight before it reaches Earth’s surface. The extent to which a given cirrus cloud does so depends not only on the number density of ice crystals in the cloud, but also on the morphologies of the crystals. Although hexagonal prisms dominate, natural cirrus clouds exhibit a great deal of variation, including long and thin hexagonal needles, short and wide plates, indentations, hollowing, and even dendritic forms \cite{nakaya_snow_1954,libbrecht_formation_2007}. Moreover, the faceted surfaces of ice crystals can be rough on a scale that matters to the wavelength of sunlight  \cite{jarvinen_ice_2023}. Because of this variability, integrating ice crystal morphologies into climate models remains a formidable task, and contributes significantly to uncertainties in climate change prediction.
+
+All this points to a need for better models of ice surface morphology and dynamics. Atomistic-scale studies have contributed greatly to this effort (see, e.g., \cite{llombart_surface_2020}). ``Mesoscale'' models, defined here as models spanning distances of micrometers to hundreds of micrometers, have also been developed, of which several excellent reviews are available \cite{harrington_approximate_2021,feigelson_50_2004,feigelson_crystal_2022}. Two theoretical frameworks that are particularly relevant to the present work are Classical Nucleation Theory and continuum theories of crystal growth.
+
+In Classical Nucleation Theory (CNT), the atomistic view of the process of crystal growth can be summarized as follows: when a gas-phase water molecule encounters a crystalline ice surface, it initially becomes attached to that surface as an “admolecule.” Not yet part of the crystal’s lattice, the admolecule diffuses across the surface until it meets one of two fates: either it fills an unoccupied position in the crystal lattice, or else it returns to the gas phase. New layer formation is governed by a 2D nucleation process in which the step free energy plays a central role \cite{kuroda_growth_1982}.
+
+CNT has long framed how we think about ice crystal growth from the vapor phase, but it suffers from some significant drawbacks. First, it offers little guidance when it comes to describing the behavior of crystals placed in a vapor field that is inhomogeneous on a mesoscopic scale. To be specific, when a growing faceted ice crystal is situated in a supersaturated vapor field, the expectation is that the surrounding water vapor concentration will be drawn down in such a way that protruding corners will experience persistently higher vapor pressures than facet centers. This pattern of higher concentrations immediately above a growing crystal surface was first noted by Berg \cite{berg_crystal_1938}, in the context of crystal growth from solutions, and will therefore be termed ``Bergian.'' CNT predicts that Bergian growth conditions would result in faster growth at those protruding corners, leading ultimately to dendritic forms (similar to snowflakes). However, under typical cirrus cloud conditions, it is known that hexagonal prisms \textit{resist} that tendency, despite those inhomogeneities. Standard CNT provides limited guidance for this situation because its usual formulation does not explicitly describe the coupled evolution of a mesoscale surface and an inhomogeneous vapor field. In particular, it does not by itself provide a mechanism for explaining how a faceted surface might reorganize in response to spatial variations in the vapor field while maintaining an approximately uniform growth rate.
+
+A second shortcoming of CNT concerns the presence of a quasiliquid layer on the surface. As ice approaches its melting point, the ice/air interface develops a premelted, liquid-like layer commonly referred to as a quasiliquid layer (QLL). Both experimental and theoretical studies have shown that the structure and thickness of this layer depend sensitively on temperature and surface properties \cite{slater_surface_2019,hong_imaging_2024,baran_understanding_2025,macdowell_key_2026}. Moreover, molecular dynamics studies have shown that gas-phase water molecules striking the QLL surface are thermalized quickly -- on a picosecond time scale \cite{neshyba_molecular_2009}. While the presence of a QLL does not preclude crystalline layering, recent experimental work has shown that steps and ledges may form \textit{underneath} the QLL, at the interface between the QLL and the underlying ice \cite{murata_how_2019}. These observations highlight a second limitation of the conventional CNT picture: the surface layer through which molecules are transported need not coincide with the crystalline growth front. A theory that explicitly represents both the QLL and its dynamical coupling to the underlying ice is therefore needed to describe this regime.
+
+% \subsection{A continuum approach to modeling ice crystal surface dynamics}
+A quasiliquid-continuum model, here referred to as QLC-1, was presented by some of the authors in Neshyba et al \cite{neshyba_quasi-liquid_2016} (henceforth N2016) as a way to address these shortcomings. The main quantities and processes are indicated in Fig. \ref{fig:Mesoscale}. Dynamical variables $N_{tot}$ and $N_{QLL}$ (both functions of time and position on the ice surface) represent the total thickness of the ice surface and its quasiliquid part, respectively. We define the crystalline ice thickness as \(N_{ice}=N_{tot}-N_{QLL}\); thus \(N_{tot}\) and \(N_{QLL}\) are the two independent dynamical variables. The two labeled points on the surface represent limiting cases: ``$\mu$surface I'' is the thinnest and least volatile possible microsurface, while ``$\mu$surface II'' is the thickest and most volatile microsurface. Between these two we imagine a continuum of possibilities, intermediate in thickness and volatility. The evolution of the surface over time is governed by a pair of reaction-diffusion equations representing the processes indicated by arrows in Fig. \ref{fig:Mesoscale}. These take into account exchange of QLL molecules with the vapor phase (deposition and sublimation), diffusion of QLL molecules across the ice surface, and conversion of QLL molecules to and from the underlying ice.  
+
+\begin{figure}[htbp]
+  \centering
+  \label{fig:a}
+  \includegraphics[width=0.7\textwidth]{Figure - Mesoscale variables.png}
+  \caption{Visual representation of mesoscale variables $N_{tot}$, $N_{ice}$, and $N_{QLL}$, and processes affecting them, in the QLC-1 and QLC-2 models. }
+  \label{fig:Mesoscale}
+\end{figure}
+
+The main insight afforded by QLC-1 (as described in N2016) lies in its explanation of the robustness of faceted ice growth in the face of inhomogeneities in the overlying vapor field, as a stable limit cycle. Because (as it turns out) that mechanism is the same in the present model, QLC-2, we defer detailed discussion of it to a later section. 
+
+QLC-1 also has significant limitations. Most importantly, the timescale governing equilibration between the QLL and underlying ice is not an explicit parameter of the model. Instead, it is effectively fixed relative to the timescales of vapor exchange and QLL diffusion. In real crystals, however, the rate of QLL/ice equilibration could vary among facets and with environmental conditions such as temperature and vapor pressure. Treating this timescale explicitly therefore provides a useful additional degree of freedom. A second shortcoming is that, as presented in N2016, inhomogeneities in the overlying vapor field used in simulations were limited to growth conditions; sublimation conditions were not considered. Moreover, the mathematical representation of those inhomogeneities in N2016 was speculative: experimental observations of dynamically growing or ablating faceted surfaces were not available at that time.
+
+The goal of the present work is to address these shortcomings by formulating QLC-2, a revised pair of equations of motion in which the timescale of QLL/ice equilibration is made explicit through the parameter $t_{eq}$. We also replace the idealized vapor-field profiles used in N2016 with profiles obtained from simulations of vapor diffusion around growing and sublimating ice crystals, and compare these profiles with surface topologies retrieved from cryoscopic scanning electron microscopy. We then show that the mechanism underlying faceted growth in QLC-1 extends naturally to sublimating surfaces, leading to the prediction of faceted sublimation. Finally, a nondimensionalization of QLC-2 allows us to infer how a characteristic spatial scale of surface structure depends on $D_{QLL}$ and $t_{eq}$.
+
+\section{Simulation of the vapor field around growing and sublimating ice crystals}
+
+A key feature of the revised theory presented here is that the water vapor supersaturation profile is obtained from a simulation of the water vapor partial pressure, $P_{vap}(x,y)$, within a space surrounding an idealized, two-dimensional crystal. This is accomplished by integrating the two-dimensional diffusion equation
+\begin{equation}
+    \label{eq:vapor}
+    \frac{\partial P_{vap}}{\partial t} = D_{vap}\nabla^2P_{vap}
+\end{equation}
+where $D_{vap}$ is the diffusion coefficient of water vapor through air, computed by
+\begin{equation}
+    \label{eq:Dvap}
+    D_{vap} = D_{vap}^o
+    % \left(\frac{P_o} {1 \text{ atm} } \right)
+    \left({P_o \over P_{total}}\right)
+    \left({T \over T_o}  \right)
+    ^{m_D}
+\end{equation}
+where $P_o=1 \ atm$, $T_o=273 \ K$, and we have written $P_{total}$ to indicate the combined pressure of water vapor and the ambient air. Values of $D_{vap}^o$ and $m_D$ are given in Table \ref{table: vapor field parameters}.
+
+Imposition of a Dirichlet boundary condition on Eq. \ref{eq:vapor} consists of specifying a constant, far-field vapor supersaturation, $\sigma_{I,\infty}$, at the outside boundary of a two-dimensional simulation space. A second boundary condition represents the rate of growth of an ice surface, $g_{ice}$, due to exchange of water with an air layer of thickness $\Delta x$ immediately normal to it (e.g., $g_{ice}$ has units ${\mu m \over s}$). That implies a molar flux ${dn \over dt}=g{A \rho_{ice} \over M_{H_2O}}$, where $\rho_{ice}$ is the mass density of ice, $M_{H_2O}$ is the molar mass of water, and $A$ is the area of a given surface. If we make the further assumption that the water vapor in the layer of air bordering the ice surface behaves ideally, then ${dn\over dt}={V \over RT}{dP_{vap} \over dt}$, where $R$ is the universal gas constant, $T$ is the simulated temperature. Using $V=A \Delta x$, we arrive at a flux boundary condition at the ice surface given by
+\begin{equation}
+    \frac{\partial P_{vap}}{\partial t} = -g_{ice} {\rho_{ice} RT \over M_{H_2O} \Delta x}\
+    \label{eq:Neumann}
+\end{equation} 
+
+The primary goal of conducting vapor field simulations is to obtain supersaturation profiles adjacent to the ice surface of a given facet, e.g.,
+\begin{equation}
+    \sigma_I(x) = \frac {P_{vap}(x)-P_{vap}^{eq}(T)}{P_{vap}^{eq}(T)}
+    \label{eq:sigmaI_VF}
+\end{equation}
+where $P_{vap}^{eq}(T)$ is computed in the usual way, i.e., by the Clausius-Clapeyron equation corresponding to water vapor in equilibrium with ice. These profiles are then used to parameterize desired analytical forms, such as a quadratic dependence of $\sigma_I$ on $x$ (described in more detail in Section \ref{subsection:Bergian and anti-Bergian} below).
+
+\section{Ice surface structure from scanning electron microscopy experiments}
+In a previous communication \cite{butterfield_quantitative_2017}, some of the present authors presented an algorithm for computing quantitative surface topology of ice from images of ice crystals grown in a scanning electron microscope (SEM). The algorithm employs Gauss-Newton inversion of scanning electron images of ice within a Bayesian framework (``GNBF"; see also \cite{rodgers_inverse_2000}), to retrieve the three-dimensional topology of an ice surface. In \cite{butterfield_quantitative_2017}, the goal was to characterize facet roughness. Here, by contrast, the goal is to characterize curvature across an otherwise smooth facet, on the assumption that such curvature results from inhomogeneities in the density of water vapor just above the ice surface. Examples of resulting images are shown in Section \ref{subsection:SEM Results} below.
+
+\section{QLC-2 equations of motion}
+\label{sec:QLC2}
+Ice crystal evolution in the QLC-2 model is governed by the equations
+\begin{align}
+    \frac{\partial N_{tot}}{\partial t} &= D_{QLL}\nabla^2_xN_{QLL} + \nu_{kin}\sigma_m(x,t)
+    \label{eq:QLC2-tot}\\
+    \frac{\partial N_{QLL}}{\partial t} &= \frac{\partial N_{tot}}{\partial t} - \frac{N_{QLL}-N_{QLL}^{eq}(N_{tot})}{t_{eq}}
+    \label{eq:QLC2-qll}
+\end{align}
+which have the following properties:
+% \medskip
+\begin{enumerate}
+    \item The operator $D_{QLL}\nabla_x^2$ in Eq. \ref{eq:QLC2-tot} represents surface diffusion of the QLL. It operates on $N_{QLL}$, rather than $N_{tot}$, to represent the idea that only the QLL (not the underlying ice) is mobile on time scales considered here. The value of $D_{QLL}$ used here is given in Table \ref{table: QLC-2 parameters}. (When a temperature-dependent value is desired, we have the option of obtaining $D_{QLL}$ from measurements of the self-diffusion coefficient of supercooled water, using the logarithmic formula reported by Price et al \cite{price_self-diffusion_1999}.) 
+    
+    \item $\nu_{kin}$ is the rate at which vapor-phase water molecules strike the ice surface. It is assumed that these stick with 100\% efficiency, and thermalize on a picosecond time scale (i.e., instantaneously within the time scale of QLC-2 simulations), as documented by \cite{neshyba_molecular_2009}. It can be obtained from the temperature according to the Hertz-Knudsen formula,
+    \begin{equation}
+        \nu_{kin} = P_{vap}^{eq}(T)\times\left(\frac{M_{H_2O}}{2\pi RT}\right)^{1/2} / (\rho_{ice} \times h_{bilayer})
+        \label{eq:nu_kin}
+    \end{equation}
+    where $P_{vap}^{eq}(T)$ is the equilibrium vapor pressure of ice (obtained by the usual Clausius-Clapeyron formula, using the triple-point temperature of ice as a reference point), $R$ is the universal gas constant, $M_{H_2O}$ is the molar mass of water, $\rho_{ice}$ is the mass density of ice, and $h_{bilayer}$ is the thickness of the bilayer of ice of interest (in the present paper, a prismatic bilayer of ice).
+    
+    \item The effective surface supersaturation, $\sigma_m$ in Eq. \ref{eq:QLC2-tot}, is a measure of the supersaturation ``experienced'' by a given point on the ice surface. It depends not only on a prescribed surface supersaturation, $\sigma_I(x)$, but also on the volatility of the microsurface at that point. QLC-2 implements this idea as
+    \begin{equation}
+        \sigma_m(x,t) = \sigma_I(x) - \left(\frac{N_{QLL}(x,t) - (\bar{N} - N^*)}{2N^*}\right)\sigma^o
+        \label{eq:sigmaM}
+    \end{equation}
+    
+    Since $\mu$surface I (corresponding to the minimum QLL thickness appearing in Fig. \ref{fig:Mesoscale}) has $N_{QLL}=(\bar{N} - N^*)$, this formulation ensures that a point on the surface characterized by $\mu$surface I will experience $\sigma_m(x) = \sigma_I(x)$. 
+    Likewise, since $\mu$surface II (corresponding to the maximum QLL thickness appearing in Fig. \ref{fig:Mesoscale}) has $N_{QLL}=(\bar{N} + N^*)$, this formulation ensures that a point on the surface characterized by $\mu$surface II will experience a lower effective supersaturation, $\sigma_m(x) = \sigma_I(x)-\sigma^o$. Points of intermediate thickness will experience an interpolated effective supersaturation. We discuss the form of the imposed supersaturation, $\sigma_I(x)$, below, when vapor field simulation results are presented.    
+         
+    \item The form of the right-most term in Eq. \ref{eq:QLC2-qll}, $\frac{N_{QLL}-N_{QLL}^{eq}(N_{tot})}{t_{eq}}$, is the primary departure of QLC-2 from QLC-1. The function $N_{QLL}^{eq}(N_{tot})$ appearing in the numerator prescribes the thickness of quasiliquid when it is in equilibrium with the underlying ice, 
+    \begin{equation}
+        N_{QLL}^{eq}(N_{tot}) = \bar{N} - N^*\sin(2\pi N_{tot}).
+        \label{eq:NeqQLL}
+    \end{equation}
+    This formulation ensures that the \textit{equilibrium} QLL thickness varies sinusoidally from the thin $\mu$surface I (as just mentioned, having thickness $\bar{N}-N^*$) to the thick $\mu$surface II (thickness $\bar{N}+N^*$), in accordance with the MD simulations reported in N2016. The denominator, $t_{eq}$, is a first-order relaxation constant describing the time scale of quasiliquid/ice equilibration, shown schematically as a vertical arrow on the left-hand side of Fig. \ref{fig:Mesoscale}.  
+    
+
+\end{enumerate}
+% \bigskip
+
+% \subsection{Nondimensionalized form of QLC-2}
+We can nondimensionalize Eqs. \ref{eq:QLC2-tot} and \ref{eq:QLC2-qll} through the transformations
+
+\begin{equation}
+    \tau = \frac{t}{t_{eq}} 
+    \label{eq:tau and teq}
+\end{equation}
+and 
+\begin{equation}
+    \chi = \frac x {(D_{QLL}t_{eq})^{\frac 1 2} },
+    \label{eq:chi and D and teq}
+\end{equation}
+so that
+\begin{equation}
+    \frac{\partial}{\partial t} = {1 \over t_{eq}} \frac{\partial}{\partial \tau} 
+    \label{eq:dtau dt}
+\end{equation}
+and
+\begin{equation}
+\nabla_x^2 = {1 \over D_{QLL}t_{eq}} \nabla_\chi^2
+\end{equation}
+resulting in
+\begin{equation}
+    \frac{\partial N_{tot}}{\partial \tau} = \nabla_\chi^2 N_{QLL} + \omega_{kin}\sigma_m(\chi,N_{QLL})
+    \label{eq:QLC2-tot-ND}
+\end{equation}
+\begin{equation}
+    \frac{\partial N_{QLL}}{\partial \tau} = \frac{\partial N_{tot}}{\partial \tau} - \left(N_{QLL} - N_{QLL}^{eq}(N_{tot})\right)
+    \label{eq:QLC2-QLL-ND}
+\end{equation}
+where $\omega_{kin} = t_{eq}\nu_{kin}$. Two inferences may be drawn from these equations. One is that $t_{eq}$ and $\nu_{kin}$ are not independent parameters: faster interconversion of QLL and ice (smaller $t_{eq}$) can be compensated by faster deposition of water vapor (bigger $\nu_{kin}$). A second inference is that the inverse square-root dependence of the horizontal coordinate on $D_{QLL}$ implies that horizontal surface features that emerge in solutions to these equations will scale in proportion to that quantity; we return to this point later, in the context of the relationship between the present results and Turing's theory of spontaneous pattern formation.
+
+The above equations are written assuming a one-dimensional context (hence expressions like $\sigma_m(x,N_{QLL})$). It is sometimes useful, however, to reduce that dimensionality to zero by setting $D_{QLL}=0$. Trajectories of the zero-dimensional system are discussed briefly below.
+
+\section{Methods}
+The vapor pressure equation of motion (Eq. \ref{eq:vapor}) is integrated using Euler’s method, with parameters given in Table \ref{table: vapor field parameters}. The QLC-2 equations of motion are solved using standard methods, e.g., RK45. 
+
+\section{Results}
+\label{sec:Results}
+
+\subsection{Bergian and anti-Bergian patterns of vapor concentrations}
+\label{subsection:Bergian and anti-Bergian}
+Selected vaporfield results are shown in Fig. \ref{fig:vaporfield}. The upper panel of column (a) of this figure demonstrates what we define here to be a ``Bergian pattern,'' namely, where the supersaturation immediately above a growing faceted surface is higher at facet corners than it is at the facet center. The lower panel of column (a) shows the supersaturation immediately above the crystal surface, along with a parabolic representation,
+% \setlength{\abovedisplayskip}{4pt}
+% \setlength{\belowdisplayskip}{4pt}
+\begin{equation}
+    \sigma_I(x) \approx \sigma_{I,\text{corner}}\times \left(c_r\left(\frac{x}{L}\right)^2+(1-c_r)\right)
+\end{equation}
+where $x$ specifies position on the ice surface, and $c_r$ (for ``center reduction'') is a dimensionless measure of the center-to-corner contrast in supersaturation, 
+\begin{equation}
+    c_r = 1-\frac{\sigma_{I,\text{middle}}}{\sigma_{I,\text{corner}}}
+    \label{eq:center_reduction}
+\end{equation}
+Column (b) exhibits an ``anti-Bergian  pattern,'' where $\sigma_I$ immediately above a growing faceted surface is \textit{lower} at facet corners than it is at the facet center. This can be ascribed, in SEM experiments, to adjacent facets that are closer to a cold mounting substrate growing so fast that they deplete nearby air of water vapor. Column (c) returns to a ``Bergian pattern,'' but in the context of sublimation. That is, $\sigma_I$ immediately above a sublimating faceted surface is more extreme (more negative) at facet corners relative to the facet center. 
+
+\begin{figure}[h]
+\begin{center}
+\begin{tabular}{ccc}
+        \hspace{6mm}$(a)$ & \hspace{6mm}$(b)$ & \hspace{6mm}$(c)$ \\
+      \includegraphics[width=.3\linewidth]{row1_sigmaI_contours.png} &\includegraphics[width=.3\linewidth]{row2_sigmaI_contours.png}&\includegraphics[width=.3\linewidth]{row3_sigmaI_contours.png}\\
+      \includegraphics[width=.3\linewidth]{row1_sigmaI_x.png}&
+      \includegraphics[width=.3\linewidth]{row2_sigmaI_x.png}&
+      \includegraphics[width=.3\linewidth]{row3_sigmaI_x.png}\\ 
+\end{tabular}
+\end{center}
+\caption{(a) Steady-state water vapor supersaturation around a square ice crystal indicated by black lines at the center, obtained by solving Eq. \ref{eq:vapor}, subjected to Dirichlet supersaturated conditions in the far field and constant water vapor flux conditions at the crystal surface (Eq. \ref{eq:Neumann}) (see table \ref{table: QLC-2 parameters}) with equal growth rates at all four surfaces of the crystal. In the upper panel, contours of increasing diameter correspond to higher supersaturation values. The lower panel shows supersaturations that would be felt by a $\mu$surface I microfacet at the crystal surface due to the vapor pressure immediately adjacent to it, obtained using Eq. \ref{eq:sigmaI_VF}. (b) Similar to (a), but with flux conditions corresponding to growth rates at the left and right sides of the crystal surface that are four times greater than at the upper and lower crystal surface. (c) Similar to (a), but with subsaturated far-field water vapor and therefore sublimation at the crystal surface. In the upper panel, contours of increasing diameter correspond to more extreme subsaturation.}
+\label{fig:vaporfield}
+\end{figure}
+
+
+\subsection{Results from scanning electron microscopy}
+\label{subsection:SEM Results}
+Figure \ref{fig:GNBF} shows the results of retrieving surface heights using SEM/GNBF on a prismatic facet of a growing ice crystal. The distinct concave pattern in the crystallographic \(a\)-axis direction is "anti-Bergian", and can be understood as being due to proximity to two other prismatic facets, both of which are likely growing faster than the target facet, because of their proximity to the (cold) copper platform. 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=.8\linewidth]{Figure - GNBF retrieval.png}
+    \caption{Left: Scanning electron image results of a growing ice crystal. Crystallographic axes ``a'' and ``c'' are indicated as dotted and dashed-dot lines, respectively. Right: results of GNBF surface reconstruction, as described in \cite{butterfield_quantitative_2017}. Distances are in micrometers.}
+    \label{fig:GNBF}
+\end{figure}
+
+\subsection{QLC-2 continuum model results (0-dimensional)}
+Figure \ref{fig:zero-dimensional} shows results from three runs of the zero-dimensional (i.e., $D_{QLL}=0$) version of QLC-2. Three different initial conditions, depicted as red-colored circles, all quickly converge to a limit cycle that appears stable and whose thickness is periodic in time. As the quasiliquid layer grows thicker, the conversion of quasiliquid to crystalline ice outpaces the rate of deposition and the quasiliquid layer shrinks. When the quasiliquid is thin, the rate of deposition outpaces the conversion to ice, and the quasiliquid layer grows. The result is a periodic variation in the QLL thickness over time, even as the crystal as a whole grows.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{Figure - zero-dimensional limit cycle.png}
+    \caption{Three trajectories of a zero-dimensional version of QLC-2 showing convergence to the stable limit cycle.}
+    \label{fig:zero-dimensional}
+\end{figure}
+
+\subsection{QLC-2 continuum model results (1-dimensional)}
+A snapshot from a typical trajectory of the one-dimensional version of QLC-2 is shown in Fig. \ref{fig:traj}. Panel (a) shows that the surface is structured like a staircase, with broad ``treads'' (regions where \(N_{tot}\) varies slowly with x), separated by ``risers'' (regions where $|\partial N_{tot}/\partial x|$ is large). Panel (b) shows that treads have QLL thickness corresponding to the thick $\mu$surface II, while risers have thickness close to the thinner $\mu$surface I. Dynamically, this means that risers experience a higher effective supersaturation ($\sigma_m$) than treads, for the same imposed supersaturation ($\sigma_I$), and therefore can be expected to grow faster. As a consequence, over time, the staircase appears to move toward the facet center, while new steps form at facet corners. Animations in the Supplemental Information display these properties dynamically.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{Figure - microsurfaces.png}
+    \caption{An ice surface covered by QLL, as simulated by QLC-2. Panel (a) shows total ice thickness and the underlying crystalline ice thickness. Panel (b) shows the difference between these, i.e., the thickness of the quasiliquid layer.}
+    \label{fig:traj}
+\end{figure}
+
+We can use Figure \ref{fig:traj} to describe, qualitatively, a mechanism for uniform growth. The first part of the mechanism relies on the notion of ``diffusive slowdown'': diffusion of the QLL slows the average rate of growth of the surface. The reason for diffusive slowdown is that risers are constantly receiving an influx of quasiliquid from nearby treads, because the latter have thicker quasiliquid. The constant loss of $\mu$surface I-like coverage slows down growth overall. 
+
+The second part of the mechanism relies on the notion that diffusive slowdown is not the same across a given surface: there is more diffusive slowdown where the staircase is steeper, and therefore the steps are closer together. Panel (b) of Fig. \ref{fig:traj} shows that transitions in quasiliquid thickness around riser positions become ever sharper as one proceeds from facet center to facet corners. That sharpness leads to faster diffusion into riser positions, hence greater diffusive slowdown, as one nears facet corners. 
+
+The third part of the mechanism of uniform growth concerns the way greater diffusive slowdown at facet corners acts to compensate for the faster potential for growth there due to higher $\sigma_I$ (assuming a Bergian pattern of the overlying water vapor concentration). It turns out that -- because of nonlinearities in the equations of motion -- surfaces are spontaneously attracted to a state in which this compensation is dynamically stabilized. More precisely, the system evolves spontaneously toward a stable limit cycle for $N_{QLL}$, and a periodic traveling wave pattern for $N_{tot}$. The result is the uniform growth rate across the entire surface associated with faceted growth.
+
+A quantitative version of the above three-part mechanism for uniform (faceted) growth in the presence of inhomogeneities in the overlying vapor field was provided by N2016. N2016 did not, however, probe the full extent of the mechanism, as we elaborate next with the help of Fig. \ref{fig:growth_and_ablation}. In that figure, we see a modeled ice crystal surface subjected to three overlying vapor field profiles. Each simulation begins with a flat surface, and each leads to a distinctive limit-cycle/periodic traveling wave solution for $N_{QLL}$ and $N_{tot}$, respectively. Specifically:
+
+\begin{figure}
+    \centering
+    \includegraphics[width=2.0\linewidth]{Figure - growth_and_ablation.png}
+    \caption{Solutions to QLC-2 for three overlying water vapor concentration profiles, $\sigma_I(x)$. (a) Results of the ``reference system" of Table \ref{table: QLC-2 parameters} simulation with a parabolic, supersaturated Bergian $\sigma_I(x)$ imposed. The upper-left panel shows $\sigma_I(x)$. The lower-left panel shows resulting total ice, $N_{tot}$, and $N_{ice}$, the crystalline ice thickness, of the converged limit cycle. $N_{steps}$, defined as the range of  $N_{tot}$ at any given time, is shown in the right-hand panel; leveling off after $\mathord{\sim}400 \ ms$ shows that the limit cycle has been reached. (b) Solutions when a sinusoidal supersaturation pattern is imposed. (c) Solutions under subsaturated parabolic Bergian conditions, with $c_r$ reduced to $0.03$, $\nu_{kin}$ reduced to $0.365$, and $t_{eq}$ reduced to $0.75 \ \mu s$ compared to the ``reference system" of Table \ref{table: QLC-2 parameters}.}
+    \label{fig:growth_and_ablation}
+\end{figure}
+
+\medskip
+\begin{itemize}
+\item Case (a) shows the result of imposing a convex (Bergian) supersaturation profile over an initially flat surface. After $\mathord{\sim} 400$ $ms$, the surface has formed a convex, staircase-shaped limit cycle for which the total ice thickness, $N_{tot}$, and the crystalline ice thickness, $N_{ice}$, mimic the shape of the overlying supersaturation profile. The range of $N_{tot}$ in this staircase defines $N_{steps}$, plotted as a function of time in the right-hand panel. 
+\end{itemize}
+
+\medskip
+\begin{itemize}
+\item Case (b) imposes a sinusoidal pattern of supersaturation. We do not expect such patterns to occur in real crystals, the intent is rather to probe whether the domain of the attractor spans such inhomogeneities. The answer is yes: after a time interval of only $\mathord{\sim}60$ $ms$, in fact, an initially-flat ice surface exposed to this vapor profile has converged to a limit cycle. Moreover, once again, $N_{tot}(x)$ and $N_{ice}(x)$ mimic the shape of $\sigma_I(x)$.
+\end{itemize}
+
+\medskip
+\begin{itemize}
+\item Case (c) imposes a subsaturated vapor profile, concave-shaped, and therefore (like (a)) Bergian. After $\mathord{\sim}2000$ $ms$, an initially-flat ice surface has also converged to a limit cycle that mimics the curvature of the overlying vapor profile, with a staircase-like structure. Unlike cases (a) and (b), this is a \textit{sublimating} limit cycle. Careful inspection, moreover, reveals a surprise: here (and in all other sublimating limit cycles we have found), \textit{treads are thin and $\mu$surface I-like}, while \textit{risers are thick and $\mu$surface II-like}. The rationale for this rests on the observation that in a subsaturated environment, the least-volatile microsurface ($\mu$surface I) is the most resistant to sublimation. 
+\end{itemize}
+\medskip
+
+The take-home message of Fig. \ref{fig:growth_and_ablation} is that QLC-2 supports limit-cycle attractors over a greater range of overlying vapor field concentrations than previously understood (in N2016). Specifically, these attractors include both Bergian (V-shaped) and anti-Bergian ($\Lambda$-shaped) vapor supersaturation patterns, as well as subsaturated conditions. The latter leads to the prediction of \textit {faceted sublimation}, in which $\mu$surfaces associated with treads and steps are swapped relative to the associations during growth conditions.
+
+% \begin{figure}[H]
+\begin{figure}
+    \begin{center}
+    \includegraphics[width=1\linewidth]{Figure 7 - Nsteps.png}
+    \end{center}
+    \caption{$N_{steps}^{limit}$ as a function of variations of the center reduction ($c_r$), kinetic velocity ($\omega_{kin}$), and surface diffusion coefficient ($D_{QLL})$ relative to the reference state defined in Table \ref{table: QLC-2 parameters}. Lines indicate use of Eq. \ref{eq:N_steps}.}
+    \label{fig:Nsteps}
+\end{figure}
+
+Figure \ref{fig:Nsteps} explores $N_{steps}^{limit}$, defined as the range of $N_{tot}$ achieved after the limit cycle has been reached (e.g., the leveled-off values of $N_{steps}$ appearing in the right-hand column of Fig. \ref{fig:growth_and_ablation}), as a function of parameters $c_r$, $\omega_{kin}$, and $D_{QLL}$. Solid lines employ the form
+\begin{equation}
+    N_{steps}^{limit} \approx N_{comb} 
+    \times c_r^{m_{cr}} 
+    \times \omega_{kin}^{m_\omega}
+    \times D_{QLL}^{m_D}
+    \label{eq:N_steps}
+\end{equation}
+where we find (empirically) that $m_{c_r}=0.498$, $m_{\omega_{kin}}=0.589$, $m_D=-0.493$, and $N_{comb}=0.311$ (all dimensionless).
+
+% Because each crystalline lattice layer has a fixed thickness, the shapes of the limit-cycle profiles such as those appearing in Fig. \ref{fig:steady} can be summarized by the mean horizontal distance between successive molecular layers, defined as
+% \begin{equation}
+%     \bar{\lambda}_{QLC-2} = L / n_{steps}.
+% \end{equation}
+
+
+\section{Summary}
+
+We have found that the uniform growth (i.e., faceting) exhibited by solutions of the QLC-2 model is highly robust, able to overcome a diversity of inhomogeneities in the overlying vapor field. This is demonstrated by the trajectories shown in Fig. \ref{fig:growth_and_ablation}, which represent only a few cases out of many that we have examined: in fact, every smoothly varying profile $\sigma_I(x)$ that we have examined leads to a distinctive and stable limit cycle for $N_{QLL}$ and periodic traveling wave solution for $N_{tot}$, so long as the numerical sampling interval of the model is small enough to resolve successive steps. The mechanism enabling this robustness, ``diffusive slowdown,'' consists of the tendency of any part of a facet surface subjected to higher overlying vapor concentration to reorganize itself in such a way that it becomes less efficient at capturing and converting vapor into ice.
+
+The QLC-2 model also predicts that growing facets will develop mesoscale profiles that are convex or concave, depending on whether the inhomogeneity of the overlying vapor field is Bergian (i.e., convex-shaped vapor supersaturation profiles) or anti-Bergian (concave-shaped vapor supersaturation profiles). Similar patterns are found in reconstructions of SEM-grown ice crystals, such as the one shown in Fig. \ref{fig:GNBF}. (We hasten to note, however, that the vertical relief of the patterns that we are able to generate numerically using QLC-2 is of just a few dozen molecular layers, as opposed to the vertical relief observed in SEM experiments, which can be thousands of molecular layers.)
+
+\section{Discussion}
+
+It is of interest to compare the present results to the familiar phenomenon of ``Turing patterns.'' In Turing's formal treatment \cite{turing_chemical_1952}, spatial patterns originating from reaction-diffusion dynamics are predicted to exhibit a characteristic distance -- for example, a characteristic separation between stripes on a zebra's skin. That distance, in Turing's formulation, depends on the square root of the surface diffusion coefficient of key reactants. Here, the spatial transformation leading to the nondimensional form of QLC-2, specified by Eq. \ref{eq:chi and D and teq}, leads almost trivially to an analogous conclusion, namely, that structural features that appear on the surface of ice will scale in proportion to the square root of $D_{QLL}t_{eq}$, the surface diffusion coefficient of quasiliquid, as well as the square root of $t_{eq}$, the relaxation time of QLL/ice equilibration. Moreover, this conclusion is not limited in the same way that Turing's theory is, in that Turing’s conclusions proceed from a sensitivity analysis to perturbations to an initially homogeneous distribution of chemical species, whereas the present conclusion comes to the steady state. The work of \cite{arioli_existence_2015} may also be relevant here, in the dependence of the stability of traveling pulse solutions of the FitzHugh–Nagumo equation on time scales intrinsic to that model.
+
+A meteorological implication of the above concerns the morphology of cirrus ice crystals as they fall through Earth’s atmosphere. As such crystals fall, they will encounter increased pressure, hence smaller $D_{vap}$, but also increased temperatures (unless there is an atmospheric inversion), hence larger $D_{vap}$. If the first of these dominates, our vaporfield simulations predict larger $c_r$, and therefore (according to QLC-2) enhanced growth at facet corners and a greater propensity toward hollowed crystal structures. Although there is no single observational datum that would definitively test these predictions, we can comment that in exceptionally cold regions (such as the Antarctic Plateau), or even in mid-latitudes where high-altitude cryo-capture of ice crystals on ground-launched balloons is possible, observations have shown that basal facets of cirrus cloud ice crystals are frequently hollowed \cite{magee_mesoscopic_2014,magee_captured_2020, walden_atmospheric_2003}. 
+
+We should note that the results presented here do not consider variations in parameters $\sigma^o$, $N^*$, and $\bar{N}$. Because different facet types (basal, prismatic, or pyramidal) have distinct underlying crystal cell structures, it is to be expected that their quasiliquid properties ($\sigma^o$, $N^*$, and $\bar{N}$) will differ from those presented here. More work will be necessary to learn whether those differences translate into any qualitatively new phenomena.
+
+Another caveat concerns assumptions embedded in the structure of the theory itself. First, the term $N_{QLL}^{eq}$ introduced in Eq. \ref{eq:QLC2-qll} effectively presupposes a single reference plane, and therefore a single, horizontal facet. Second, we have found that numerical instabilities creep into solutions under certain conditions, including (and tellingly) when the gradient of $N_{tot}$ becomes too high relative to the spatial resolution chosen ($dx$) in the numerical solution of the problem. We speculate that addressing these limitations together, via a generalized version of QLC-2, has the potential to yield solutions that not only represent faceting in different planes (e.g., pyramidal or basal), but also provide insight into the nature and onset of facet roughness.
+
+Finally, although the context here is vapor-exposed water ice, we speculate that something akin to QLC-2 theory could be adapted to more general contexts (e.g., to crystals grown from solutions, or to vapor-grown crystals other than water). First, the expression for the kinetic velocity $\nu_{kin}$, Eq. \ref{eq:nu_kin}, is easily modified for volatile substances other than water vapor, and one can imagine plausible analogs for solutes as well. Second,  volatilities of the two limiting-case microsurfaces ($\mu$surfaces I and II) assumed here for the purpose of computing effective supersaturation ($\sigma_m$ in Eq. \ref{eq:QLC2-qll}) are more generally expressible in terms of chemical potentials, which would apply to solutes as well. Third, it has long been recognized that surface diffusion plays an essential role in crystal growth from solutions as well as from vapor \cite{bennema_importance_1969,burton_growth_1951}, and that a mobile surface layer ``which constitutes a transition'' between the solid crystal and the medium through which molecules move to add to the crystal  \cite{berg_crystal_1938} is key to that process. Two critical unknowns, in our view, are whether analogous limiting-case microsurfaces of a mobile surface layer in fact exist in solution-phase crystal growth, and if so, then what their equilibrium thicknesses (analogous to Eq. \ref{eq:NeqQLL}) and chemical potentials may be.
+
+
+
+\section{Appendix}
+
+\begin{table}[H]
+    % \label{QLC-2 parameters}
+    \caption{Default QLC-2 Parameters.}
+    \begin{tabular}{lr}
+    \hline 
+    Description & Value\\
+    \hline 
+    Facet width ($\pm L$)  & $L = 50 \ \mu$m \\
+    Spatial discretization & $dx=0.2 \ \mu$m \\
+    Volatility difference between $\mu$surfaces I and II & $\sigma^o=0.2$ \\
+    Imposed supersaturation at $x=\pm L$ & $\sigma_{corner}=0.22$ \\
+    Center reduction & $c_r = 0.002 $ \\
+    Mean thickness of QLL & $\bar{N}=1$ layer \\
+    Variability in QLL thickness & $N^*=0.1$ \\
+    Temperature & $T = 250 \ K$ \\
+    Surface diffusion coefficient & $D_{QLL} = 0.0002$ $\mu m^2/\mu s$ \\
+    Kinetic velocity & $\nu_{kin}=0.264 \ \mu s^{-1}$ \\
+    Nondimensional kinetic velocity & $\omega_{kin}=0.396$ \\
+    \hline
+    \end{tabular}
+    \label{table: QLC-2 parameters}
+\end{table}
+
+\begin{table}[H]
+    \caption{Default vapor field parameters.}
+    \begin{tabular}{lr}
+    \hline 
+    Description & Value\\
+    \hline 
+    Simulation space dimensions & $\pm 500 \ \mu m$ \\
+    Time step for integration & $dt = 5\times 10^{-5}$ $\mu$s \\
+    Time interval for integration & $t_{max} = 1$ $\mu$s\\
+    Spatial discretization & $\Delta x=\Delta y=2.8$ $\mu$m \\
+    Equilibration timescale & $t_{eq}=3.25$ ms \\
+    Diffusion coefficient at $T = 273$ $K$, $P_{total} = 1$ atm & $D_{vap}^o = 21.9$ $\mu m^2/\mu s$ \\
+    Temperature & $T = 240$ K \\
+    Total pressure & $P_{total} = 50$ $Pa$\\
+    Diffusion Temperature-correction exponent & $m_D  =1.86$ \\
+    Diffusion coefficient under ambient conditions & $D_{vap} = 3.49\times 10^4$ $\mu m^2/\mu s$ \\
+    Far-field water vapor supersaturation& $\sigma_I = 0.25$ \\
+    Mass density of ice& $\rho_{ice} = 0.917$ $g/cm^3$ \\
+    Growth rate of ice surface & $g_{ice} = 2$ $\mu m/s$ \\
+    \hline
+    \end{tabular}
+    \label{table: vapor field parameters}
+\end{table}
+
+%
+% The main text should start with an introduction. Except for short
+% manuscripts (such as comments and replies), the text should be divided
+% into sections, each with its own heading.
+
+% Headings should be sentence fragments and do not begin with a
+% lowercase letter or number. Examples of good headings are:
+
+% \section{Materials and Methods}
+% Here is text on Materials and Methods.
+%
+% \subsection{A descriptive heading about methods}
+% More about Methods.
+%
+% \section{Data} (Or section title might be a descriptive heading about data)
+%
+% \section{Results} (Or section title might be a descriptive heading about the
+% results)
+%
+% \section{Conclusions}
+
+
+% \section{= enter section title =}
+%Text here ===>>>
+
+
+%%
+
+%  Numbered lines in equations:
+%  To add line numbers to lines in equations,
+%  \begin{linenomath*}
+%  \begin{equation}
+%  \end{equation}
+%  \end{linenomath*}
+
+
+
+%% Enter Figures and Tables near as possible to where they are first mentioned:
+%
+% DO NOT USE \psfrag or \subfigure commands.
+%
+% Figure captions go below the figure.
+% Acronyms used in figure captions will be spelled out in the final, published version.
+
+% Table titles go above tables;  other caption information
+%  should be placed in last line of the table, using
+% \multicolumn2l{$^a$ This is a table note.}
+% NOTE that there is no difference between table caption and table heading in the final, published version
+%
+%----------------
+% EXAMPLE FIGURES
+%
+% \begin{figure}
+% \includegraphics{example.png}
+% \caption{caption}
+% \end{figure}
+%
+% Giving latex a width will help it to scale the figure properly. A simple trick is to use \textwidth. Try this if large figures run off the side of the page.
+% \begin{figure}
+% \noindent\includegraphics[width=\textwidth]{anothersample.png}
+%\caption{caption}
+%\label{pngfiguresample}
+%\end{figure}
+%
+%
+% If you get an error about an unknown bounding box, try specifying the width and height of the figure with the natwidth and natheight options. This is common when trying to add a PDF figure without pdflatex.
+% \begin{figure}
+% \noindent\includegraphics[natwidth=800px,natheight=600px]{samplefigure.pdf}
+%\caption{caption}
+%\label{pdffiguresample}
+%\end{figure}
+%
+%
+% PDFLatex does not seem to be able to process EPS figures. You may want to try the epstopdf package.
+%
+
+%
+% ---------------
+% EXAMPLE TABLE
+%
+% \begin{table}
+% \caption{Time of the Transition Between Phase 1 and Phase 2$^{a}$}
+% \centering
+% \begin{tabular}{l c}
+% \hline
+%  Run  & Time (min)  \\
+% \hline
+%   $l1$  & 260   \\
+%   $l2$  & 300   \\
+%   $l3$  & 340   \\
+%   $h1$  & 270   \\
+%   $h2$  & 250   \\
+%   $h3$  & 380   \\
+%   $r1$  & 370   \\
+%   $r2$  & 390   \\
+% \hline
+% \multicolumn{2}{l}{$^{a}$Footnote text here.}
+% \end{tabular}
+% \end{table}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SIDEWAYS FIGURES and TABLES
+% AGU prefers the use of {sidewaystable} over {landscapetable} as it causes fewer problems.
+%
+% \begin{sidewaysfigure}
+% \includegraphics[width=20pc]{figsamp}
+% \caption{caption here}
+% \label{newfig}
+% \end{sidewaysfigure}
+%
+%  \begin{sidewaystable}
+%  \caption{Caption here}
+% \label{tab:signif_gap_clos}
+%  \begin{tabular}{ccc}
+% one&two&three\\
+% four&five&six
+%  \end{tabular}
+%  \end{sidewaystable}
+
+%% If using numbered lines, please surround equations with \begin{linenomath*}...\end{linenomath*}
+%\begin{linenomath*}
+%\begin{equation}
+%y|{f} \sim g(m, \sigma),
+%\end{equation}
+%\end{linenomath*}
+
+%%% End of body of article
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Optional Appendices go here
+%
+% The \appendix command resets counters and redefines section heads
+%
+% After typing \appendix
+%
+%\section{Here Is Appendix Title}
+% will show
+% A: Here Is Appendix Title
+%
+%\appendix
+%\section{Here is a sample appendix}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Optional Glossary, Notation or Acronym section goes here:
+%
+% Glossary is only allowed in Reviews of Geophysics
+%  \begin{glossary}
+%  \term{Term}
+%   Term Definition here
+%  \term{Term}
+%   Term Definition here
+%  \term{Term}
+%   Term Definition here
+%  \end{glossary}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Acronyms
+%% NOTE that acronyms in the final published version will be spelled out when used in figure captions.
+%   \begin{acronyms}
+%   \acro{Acronym}
+%   Definition here
+%   \acro{EMOS}
+%   Ensemble model output statistics
+%   \acro{ECMWF}
+%   Centre for Medium-Range Weather Forecasts
+%   \end{acronyms}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Notation
+%   \begin{notation}
+%   \notation{$a+b$} Notation Definition here
+%   \notation{$e=mc^2$}
+%   Equation in German-born physicist Albert Einstein's theory of special
+%  relativity that showed that the increased relativistic mass ($m$) of a
+%  body comes from the energy of motion of the body—that is, its kinetic
+%  energy ($E$)—divided by the speed of light squared ($c^2$).
+%   \end{notation}
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% DATA SECTION and ACKNOWLEDGMENTS
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section*{Open Research Section}
+Sample Python code and animations of solutions (ice thickness, quasiliquid thickness, over time) can be found at https://github.com/upschemistry/icecontinuum.
+
+\acknowledgments
+SN thanks the National Science Foundation, project 1807898, for funding, and the University of Puget Sound, for facilities support.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% REFERENCES and BIBLIOGRAPHY
+%
+\bibliography{QLC-2}
+
+% Slater, B., Michaelides, A. Surface premelting of water ice. Nat Rev Chem 3, 172–188 (2019). https://doi.org/10.1038/s41570-019-0080-8
+
+
+
+% \bibliography{<name of your .bib file>} don't specify the file extension
+% don't specify bibliographystyle
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%\bibliography{ enter your bibtex bibliography filename here }
+
+
+
+%Reference citation instructions and examples:
+%
+% Please use ONLY \cite and \citeA for reference citations.
+% \cite for parenthetical references
+% ...as shown in recent studies (Simpson et al., 2019)
+% \citeA for in-text citations
+% ...Simpson et al. (2019) have shown...
+%
+%
+%...as shown by \citeA{jskilby}.
+%...as shown by \citeA{lewin76}, \citeA{carson86}, \citeA{bartoldy02}, and \citeA{rinaldi03}.
+%...has been shown \cite{jskilbye}.
+%...has been shown \cite{lewin76,carson86,bartoldy02,rinaldi03}.
+%... \cite <i.e.>[]{lewin76,carson86,bartoldy02,rinaldi03}.
+%...has been shown by \cite <e.g.,>[and others]{lewin76}.
+%
+% apacite uses < > for prenotes and [ ] for postnotes
+% DO NOT use other cite commands (e.g., \citet, \citep, \citeyear, \nocite, \citealp, etc.).
+%
+
+
+
+\end{document}
+
+
+
+More Information and Advice:
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  SECTION HEADS
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Capitalize the first letter of each word (except for
+% prepositions, conjunctions, and articles that are
+% three or fewer letters).
+
+% AGU follows standard outline style; therefore, there cannot be a section 1 without
+% a section 2, or a section 2.3.1 without a section 2.3.2.
+% Please make sure your section numbers are balanced.
+% ---------------
+% Level 1 head
+%
+% Use the \section{} command to identify level 1 heads;
+% type the appropriate head wording between the curly
+% brackets, as shown below.
+%
+%An example:
+%\section{Level 1 Head: Introduction}
+%
+% ---------------
+% Level 2 head
+%
+% Use the \subsection{} command to identify level 2 heads.
+%An example:
+%\subsection{Level 2 Head}
+%
+% ---------------
+% Level 3 head
+%
+% Use the \subsubsection{} command to identify level 3 heads
+%An example:
+%\subsubsection{Level 3 Head}
+%
+%---------------
+% Level 4 head
+%
+% Use the \subsubsubsection{} command to identify level 3 heads
+% An example:
+%\subsubsubsection{Level 4 Head} An example.
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  IN-TEXT LISTS
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Do not use bulleted lists; enumerated lists are okay.
+% \begin{enumerate}
+% \item
+% \item
+% \item
+% \end{enumerate}
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  EQUATIONS
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Single-line equations are centered.
+% Equation arrays will appear left-aligned.
+
+Math coded inside display math mode \[ ...\]
+ will not be numbered, e.g.,:
+ \[ x^2=y^2 + z^2\]
+
+ Math coded inside \begin{equation} and \end{equation} will
+ be automatically numbered, e.g.,:
+ \begin{equation}
+ x^2=y^2 + z^2
+ \end{equation}
+
+
+% To create multiline equations, use the
+% \begin{eqnarray} and \end{eqnarray} environment
+% as demonstrated below.
+\begin{eqnarray}
+  x_{1} & = & (x - x_{0}) \cos \Theta \nonumber \\
+        && + (y - y_{0}) \sin \Theta  \nonumber \\
+  y_{1} & = & -(x - x_{0}) \sin \Theta \nonumber \\
+        && + (y - y_{0}) \cos \Theta.
+\end{eqnarray}
+
+%If you don't want an equation number, use the star form:
+%\begin{eqnarray*}...\end{eqnarray*}
+
+% Break each line at a sign of operation
+% (+, -, etc.) if possible, with the sign of operation
+% on the new line.
+
+% Indent second and subsequent lines to align with
+% the first character following the equal sign on the
+% first line.
+
+% Use an \hspace{} command to insert horizontal space
+% into your equation if necessary. Place an appropriate
+% unit of measure between the curly braces, e.g.
+% \hspace{1in}; you may have to experiment to achieve
+% the correct amount of space.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  EQUATION NUMBERING: COUNTER
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% You may change equation numbering by resetting
+% the equation counter or by explicitly numbering
+% an equation.
+
+% To explicitly number an equation, type \eqnum{}
+% (with the desired number between the brackets)
+% after the \begin{equation} or \begin{eqnarray}
+% command.  The \eqnum{} command will affect only
+% the equation it appears with; LaTeX will number
+% any equations appearing later in the manuscript
+% according to the equation counter.
+%
+
+% If you have a multiline equation that needs only
+% one equation number, use a \nonumber command in
+% front of the double backslashes (\\) as shown in
+% the multiline equation above.
+
+% If you are using line numbers, remember to surround
+% equations with \begin{linenomath*}...\end{linenomath*}
+
+%  To add line numbers to lines in equations:
+%  \begin{linenomath*}
+%  \begin{equation}
+%  \end{equation}
+%  \end{linenomath*}
+
+
+
