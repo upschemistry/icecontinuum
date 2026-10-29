@@ -1,15 +1,19 @@
 &GI
    sigma0 = 20
    sigma0_units = 'percent'
+   sigmaI_corner = 21
    sigmaI_corner = 22
    sigmaI_corner_units = 'percent'
+   c_r = 18
    c_r = 9.8
+   c_r = 15
    c_r_units = 'percent'
    nu_kin = 0.264
    nu_kin_units = '1/microsecond'
    t_eq = 1.5
    t_eq_units = 'microsecond'
    nx_crystal = 11001 
+   nx_crystal = 5001 
    Nbar = 1
    Nstar = .1
    h_layer = 0.37
