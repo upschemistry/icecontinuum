@@ -71,7 +71,6 @@ def getDeltaNQLL(Ntot,Nstar,Nbar,NQLL):
 
 
 
-# #@njit("f8[:](f8,f8[:],f8[:],f8[:])")
 def f1d_solve_ivp(t, y, scalar_params, sigmaI, j2_list):
     Nbar, Nstar, sigma0, nu_kin_mlyperus, DoverdeltaX2, tau_eq = scalar_params
     l = int(len(y)/2)
